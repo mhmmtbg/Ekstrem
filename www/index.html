@@ -306,6 +306,11 @@ textarea.inp{min-height:90px;font-family:var(--mono);font-size:12px}
 .poster .receipt{animation:none}
 .p-foot{text-align:center;font-size:11.5px;color:var(--muted);padding-top:4px}
 [hidden]{display:none!important}
+.strow{display:flex;align-items:center;gap:4px}
+.trash{border:0;background:transparent;color:var(--muted);padding:6px;border-radius:8px;display:grid;place-items:center;flex:0 0 auto}
+.trash:hover,.trash:focus-visible{color:var(--mercan);background:var(--warn-bg)}
+.dupwarn{background:var(--warn-bg);color:var(--warn-fg);border-radius:14px;padding:12px 14px;margin-bottom:14px;display:flex;flex-direction:column;gap:6px;font-size:14px}
+.dupwarn .btn{background:var(--mercan);color:#fff;align-self:flex-start;padding:9px 14px;font-size:14px}
 </style>
 </head>
 <body>
@@ -871,6 +876,66 @@ function manualStmt(profile, month, create) {
   return st;
 }
 
+/* ---------- Kopya ekstre tespiti ---------- */
+const txKeys = st => st.tx.filter(t => t.type !== 'info').map(t => `${t.date}|${Math.round(t.tl * 100)}|${Math.round((t.usd || 0) * 100)}`);
+function txOverlap(a, b) {
+  const m = new Map(); txKeys(a).forEach(k => m.set(k, (m.get(k) || 0) + 1));
+  let hit = 0; txKeys(b).forEach(k => { const c = m.get(k); if (c) { hit++; m.set(k, c - 1); } });
+  return hit / Math.max(1, Math.min(txKeys(a).length, txKeys(b).length));
+}
+// Aynı banka + aynı kesim tarihi + işlemlerin en az %80'i aynıysa aynı ekstredir
+const sameStatement = (a, b) => !a.manual && !b.manual && a.bank === b.bank && a.kesim === b.kesim && txOverlap(a, b) >= 0.8;
+function duplicateGroups() {
+  const out = [], seen = new Set();
+  const list = S.statements.filter(s => !s.manual);
+  for (const a of list) {
+    if (seen.has(a.id)) continue;
+    const g = [a, ...list.filter(b => b !== a && !seen.has(b.id) && sameStatement(a, b))];
+    if (g.length > 1) { g.forEach(s => seen.add(s.id)); out.push(g); }
+  }
+  return out;
+}
+async function deleteStatement(id) {
+  await Store.del('statements', id); S.statements = S.statements.filter(x => x.id !== id);
+  const keys = monthKeys(); if (!keys.includes(S.month)) S.month = keys[keys.length - 1] || null;
+}
+// Kopyaları temizle: en son yükleneni tut, eskilerdeki elle kategori/notları ona aktar
+window.fixDuplicates = async () => {
+  let n = 0;
+  for (const g of duplicateGroups()) {
+    g.sort((x, y) => (y.importedAt || '').localeCompare(x.importedAt || ''));
+    const keep = g[0];
+    for (const old of g.slice(1)) {
+      for (const t of keep.tx) {
+        const o = old.tx.find(x => x.date === t.date && x.desc === t.desc && x.tl === t.tl && (x.catManual || x.note));
+        if (o) { if (o.catManual && !t.catManual) { t.cat = o.cat; t.catManual = true; } if (o.note && !t.note) t.note = o.note; }
+      }
+      await deleteStatement(old.id); n++;
+    }
+    await Store.put('statements', keep);
+  }
+  render(); toast(n ? `${n} kopya ekstre silindi` : 'Kopya ekstre yok');
+};
+function confirmSheet(title, text, okLabel) {
+  return new Promise(res => {
+    openSheet(`<h3>${esc(title)}</h3><p>${text}</p>
+      <button class="btn danger block" id="cfOk">${esc(okLabel)}</button><button class="btn ghost block" id="cfNo">Vazgeç</button>`, () => res(false));
+    $('#cfOk').onclick = () => { closeSheet(true); res(true); };
+    $('#cfNo').onclick = () => { closeSheet(true); res(false); };
+  });
+}
+window.askDeleteStatement = async id => {
+  const s = stmtById(id); if (!s) return;
+  const n = s.tx.length;
+  const ok = await confirmSheet(s.manual ? 'Kart dışı harcamaları sil' : 'Ekstreyi sil',
+    s.manual ? `<b>${mLabel(s.month)}</b> ayındaki ${n} kart dışı harcama kaydı (${esc(profName(s.profile))}) silinecek.`
+      : `<b>${esc(s.bank)}</b>, kesim ${dTR(s.kesim)} ekstresi ve içindeki ${n} işlem silinecek. PDF'i istediğin zaman yeniden yükleyebilirsin.`,
+    s.manual ? 'Kayıtları sil' : 'Ekstreyi sil');
+  if (!ok) return false;
+  await deleteStatement(id); render(); toast(s.manual ? 'Kart dışı kayıtlar silindi' : 'Ekstre silindi');
+  return true;
+};
+
 /* ---------- PDF okuma ---------- */
 function askPassword(name) {
   return new Promise(res => {
@@ -930,7 +995,7 @@ async function importFiles(files) {
       const cards = [...new Set(tx.map(t => t.card).filter(Boolean))];
       const id = `${slug(res.bank)}_${res.kesimISO}_${cards[0] || ''}`;
       // Aynı bankanın aynı kesim tarihli eski kaydı (ör. önceki sürümle farklı kimlikle alınmış) varsa onu devral
-      const twin = S.statements.find(s => !s.manual && s.id !== id && s.bank === res.bank && s.kesim === res.kesimISO && s.tx.some(t => t.card && cards.includes(t.card)));
+      const twin = S.statements.find(s => !s.manual && s.id !== id && s.bank === res.bank && s.kesim === res.kesimISO && (s.tx.some(t => t.card && cards.includes(t.card)) || txOverlap(s, { tx }) >= 0.8));
       if (twin) { await Store.del('statements', twin.id); S.statements = S.statements.filter(s => s !== twin); twin.id = id; }
       const old = stmtById(id) || twin;
       if (old) for (const t of tx) {
@@ -1123,7 +1188,11 @@ function viewOzet() {
   const insight = top ? `En büyük kalem <b>${esc(top[0])}</b>: her 100 liranın ${nf0.format(top[1] / spend * 100)}'ü buraya gitti.` +
     (change != null ? ` Toplam harcama ${mLabel(prevKey(k)).split(' ')[0]} ayına göre <b class="${change > 0 ? 'neg' : 'pos'}">%${nf0.format(Math.abs(change))} ${change > 0 ? 'arttı' : 'azaldı'}</b>.` : '') : '';
 
+  const dups = duplicateGroups().filter(g => g.some(s => s.month === k && inProfile(s)));
   return `
+  ${dups.length ? `<div class="dupwarn"><b>Aynı ekstre birden fazla yüklenmiş</b>
+    <span>${dups.map(g => `${esc(g[0].bank)}, kesim ${dTR(g[0].kesim)} (${g.length} kez)`).join('; ')}. Bu yüzden toplamlar fazla görünüyor.</span>
+    <button class="btn" onclick="fixDuplicates()">Kopyaları sil, birini tut</button></div>` : ''}
   <div class="receipt-wrap"><div class="receipt" role="group" aria-label="${mLabel(k)} harcama özeti">
     <div class="rc-head"><div class="shop">Ekstrem</div>
       <div class="meta">${up(mLabel(k))} · ${up(isHane() ? 'Hane' : profName(S.profile))}</div></div>
@@ -1194,12 +1263,15 @@ function viewOzet() {
         <span class="dotsline" aria-label="${t.taksitNo}/${t.taksitToplam} taksit">${Array.from({ length: Math.min(t.taksitToplam, 12) }, (_, j) => `<i class="${j < t.taksitNo ? '' : 'o'}"></i>`).join('')}</span></span><b>${tl(t.tl)}</b></li>`).join('')}</ul>` : ''}</section>` : ''}
 
   <section class="card"><h2>Ekstreler</h2><ul class="list-plain">${sts.map(st => st.manual
-    ? `<li><span><b>Kart dışı harcamalar</b>${isHane() ? `<span class="pill">${esc(profName(st.profile))}</span>` : ''}<br><span class="sub">${st.tx.length} kayıt: nakit, havale vb.</span></span><b>${tl(st.tx.reduce((a, t) => a + t.tl, 0))}</b></li>`
+    ? `<li><span><b>Kart dışı harcamalar</b>${isHane() ? `<span class="pill">${esc(profName(st.profile))}</span>` : ''}<br><span class="sub">${st.tx.length} kayıt: nakit, havale vb.</span></span><span class="strow"><b>${tl(st.tx.reduce((a, t) => a + t.tl, 0))}</b>${TRASH(st.id)}</span></li>`
     : `<li><span><b>${esc(st.bank)}</b>${isHane() ? `<span class="pill">${esc(profName(st.profile))}</span>` : ''}
       <br><span class="sub">Kesim ${dTR(st.kesim)}, son ödeme ${dTR(st.sonOdeme)}</span></span>
-      <b style="text-align:right">${esc(st.borcTL || '-')} ₺${st.borcUSD && st.borcUSD !== '0,00' ? '<br>+ ' + esc(st.borcUSD) + ' $' : ''}</b></li>`).join('')}</ul></section>`;
+      <span class="strow"><b style="text-align:right">${esc(st.borcTL || '-')} ₺${st.borcUSD && st.borcUSD !== '0,00' ? '<br>+ ' + esc(st.borcUSD) + ' $' : ''}</b>${TRASH(st.id)}</span></li>`).join('')}</ul></section>`;
 }
 
+function TRASH(id) {
+  return `<button class="trash" onclick="askDeleteStatement('${id}')" aria-label="Sil"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg></button>`;
+}
 function merchantKey(desc) {
   return desc.replace(/^\d{2}\/\d{2}\s+/, '').replace(/\s+\d{2}\.Tak\b.*$/, '').replace(/^Sonradan Taksit\s+/i, '')
     .replace(/\s+\d+\.\s*Taksit$/i, '').replace(/\s+\([\d.,]+ döviz\)$/, '')
@@ -1471,7 +1543,8 @@ function openSettings() {
     <label class="f">Kendi kategori kuralların (${S.rules.length})</label>
     ${S.rules.length ? `<ul class="list-plain">${S.rules.map((r, i) => `<li><span>"${esc(r.kw)}" → <b>${esc(r.cat)}</b></span><button class="x" aria-label="Kuralı sil" data-rule="${i}">×</button></li>`).join('')}</ul>` : '<p class="sub">Bir işleme dokunup kategorisini değiştirdiğinde kural buraya eklenir.</p>'}
     <label class="f">Yüklü ekstreler</label>
-    <ul class="list-plain">${S.statements.slice().reverse().map(s => `<li><span>${esc(s.manual ? 'Kart dışı harcamalar' : s.bank)} · ${mLabel(s.month)}<br><span class="sub">${esc(profName(s.profile))} · ${s.tx.length} ${s.manual ? 'kayıt' : 'satır · kesim ' + dTR(s.kesim)}</span></span><button class="x" aria-label="Ekstreyi sil" data-st="${s.id}">×</button></li>`).join('') || '<li class="sub">Yok</li>'}</ul>
+    ${duplicateGroups().length ? `<div class="dupwarn"><b>${duplicateGroups().reduce((a, g) => a + g.length - 1, 0)} kopya ekstre var</b><button class="btn" id="fixDup">Kopyaları sil</button></div>` : ''}
+    <ul class="list-plain">${S.statements.slice().reverse().map(s => `<li><span>${esc(s.manual ? 'Kart dışı harcamalar' : s.bank)} · ${mLabel(s.month)}<br><span class="sub">${esc(profName(s.profile))} · ${s.tx.length} ${s.manual ? 'kayıt' : 'satır · kesim ' + dTR(s.kesim)}</span></span><button class="trash" aria-label="Sil" data-st="${s.id}"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg></button></li>`).join('') || '<li class="sub">Yok</li>'}</ul>
     <label class="f">Yedekleme</label>
     <p class="sub" style="margin:0 0 6px">Veriler yalnızca bu telefonda (${Store.mode}) saklanır. Uygulamayı silmeden önce yedek al.</p>
     <button class="btn ghost block" id="bkDl">Yedeği dosya olarak indir</button>
@@ -1482,12 +1555,8 @@ function openSettings() {
   document.querySelectorAll('[data-theme-set]').forEach(b => b.onclick = () => {
     setTheme(b.dataset.themeSet); document.querySelectorAll('[data-theme-set]').forEach(x => x.setAttribute('aria-pressed', x === b)); });
   document.querySelectorAll('[data-rule]').forEach(b => b.onclick = async () => { S.rules.splice(+b.dataset.rule, 1); await saveKV('rules', S.rules); openSettings(); render(); });
-  document.querySelectorAll('[data-st]').forEach(b => b.onclick = async () => {
-    const s = stmtById(b.dataset.st);
-    if (!confirm(s.manual ? `${mLabel(s.month)} ayındaki tüm kart dışı harcamalar (${profName(s.profile)}) silinsin mi?` : `${s.bank} · ${mLabel(s.month)} ekstresi silinsin mi?`)) return;
-    await Store.del('statements', s.id); S.statements = S.statements.filter(x => x.id !== s.id);
-    const keys = monthKeys(); if (!keys.includes(S.month)) S.month = keys.pop() || null; openSettings(); render();
-  });
+  document.querySelectorAll('[data-st]').forEach(b => b.onclick = async () => { await askDeleteStatement(b.dataset.st); openSettings(); });
+  const fd = $('#fixDup'); if (fd) fd.onclick = async () => { await fixDuplicates(); openSettings(); };
   $('#setSave').onclick = async () => {
     document.querySelectorAll('[data-pname]').forEach(i => { const p = S.profiles.find(x => x.id === i.dataset.pname); if (i.value.trim()) p.name = i.value.trim(); });
     document.querySelectorAll('[data-card]').forEach(i => { const v = i.value.trim(); if (v) S.cards[i.dataset.card] = v; else delete S.cards[i.dataset.card]; });
