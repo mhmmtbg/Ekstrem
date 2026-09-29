@@ -5,12 +5,12 @@ on:
     branches: [ main ]
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with: { node-version: 20 }
-      - uses: actions/setup-java@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with: { node-version: 22 }
+      - uses: actions/setup-java@v5
         with: { distribution: temurin, java-version: 17 }
       - name: Bağımlılıklar
         run: npm install
@@ -18,15 +18,14 @@ jobs:
         run: |
           npx cap add android
           npx cap sync android
+      - name: Uygulama ikonu
+        run: cp -r android-res/. android/app/src/main/res/
       - name: Android izinleri ve sabit imza
         run: |
           M=android/app/src/main/AndroidManifest.xml
           sed -i 's#<application#<application android:requestLegacyExternalStorage="true"#' $M
           sed -i 's#</manifest>#    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="29" />\n</manifest>#' $M
           mkdir -p ~/.android && cp keystore/debug.keystore ~/.android/debug.keystore
-      - name: Uygulama ikonu
-        continue-on-error: true
-        run: npx @capacitor/assets generate --android --iconBackgroundColor '#1C3F7A' --splashBackgroundColor '#1C3F7A'
       - name: APK derle
         run: |
           cd android
