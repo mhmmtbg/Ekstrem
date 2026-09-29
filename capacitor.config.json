@@ -1,0 +1,6 @@
+{
+  "appId": "com.muhammet.ekstrem",
+  "appName": "Ekstrem",
+  "webDir": "www",
+  "android": { "allowMixedContent": false }
+}
