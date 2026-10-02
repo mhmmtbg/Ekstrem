@@ -1,5 +1,13 @@
 # Değişiklik Günlüğü
 
+## v1.4.1 — 2026-10-03
+
+- Plan başlangıç ayı ileri alındığında önceki aylar (gerçekleşen ya da planlanan) artık hesaptan düşmüyor; sonuçları ilk aya devir olarak geliyor. Bilançoda "Önceki aylar" bölümü görünür
+- İlk devir satırından "Sıfırdan başla" ile önceki aylar sayılmadan plan kurulabilir, istenirse geri alınır
+- Plan başlangıcından önceki gerçekleşmiş aylar için de Özet'te plan karşılaştırması gösterilir
+- Karşılaştırmada, o aydan sonra başlayan plan kalemleri yüzünden harcamaların "plan dışı" sayıldığı durum uyarılır; kalemler tek dokunuşla o aydan başlatılabilir
+- APK her derlemede depodaki aynı anahtarla imzalanır (önceki sürümler rastgele anahtarla imzalandığı için güncelleme olarak kurulamıyordu); derleme imzayı doğrular
+
 ## v1.4.0 — 2026-10-02
 
 - Yeni bankalar: Halkbank Paraf, DenizBank, Enpara.com, İş Bankası Maximum, Garanti BBVA Bonus; QNB, VakıfBank, TEB, ING, Kuveyt Türk ve diğer bankaların tanınması

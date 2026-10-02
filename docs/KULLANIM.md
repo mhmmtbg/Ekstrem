@@ -52,6 +52,8 @@ Ay ay harcama sütunları ve gelir çizgisi, ay özet tablosu (harcama, gelir, k
 
 **Başlangıç** ayı ve süre (3, 6, 12 ay) seçilir. Başlangıç seçilmemişse plan, kalemlerin başladığı ilk aydan başlar.
 
+Başlangıç ayı sonradan ileri alınırsa (örneğin Eylül'den Ekim'e) önceki aylar hesaptan düşmez: Eylül'ün gerçekleşen sonucu Ekim'e devir olarak gelir ve bilançonun başında **Önceki aylar** bölümünde görünür. Önceki ayları saymadan sıfırdan başlamak için ilk ayın devir satırına dokunup **Sıfırdan başla**'yı seçin; aynı yerden **Önceki ayların sonucunu devret** ile geri alınır.
+
 ### Kalemler
 
 - **Kart taksitleri** eklenmez, kendiliğinden gelir: her ay için o aydan önceki son ekstredeki kalan taksitler yansıtılır. Erken kapatılan bir taksit **Taksit takvimi**'nde satırına dokunularak plandan çıkarılır.
@@ -84,6 +86,7 @@ Plan kalemleri gerçek verilerle şöyle eşleşir:
 | Gelirler | Aynı adı taşıyan girilmiş gelir; yoksa plandaki tutar varsayılır |
 
 - Planda karşılığı olmayan harcama ve gelirler "Plan dışı" satırı olarak görünür.
+- Bir aya ait harcamalar, plan kalemleri o aydan **sonra** başladığı için "plan dışı" sayılıyorsa karşılaştırmada uyarı çıkar; **Bu kalemleri … ayından başlat** kalemlerin başlangıcını öne çeker.
 - "varsayıldı" etiketli kalemlere dokunarak gerçek tutar elle girilebilir.
 - Gerçekleşen ayın bilançosu sonraki aylara devreder; **ilk plan** (gerçekleşmeler olmadan hesaplanan) grafikte kesikli çizgi, bilanço tablosunda ayrı satır olarak görünür.
 - Rapor Özet'te **Plan ile karşılaştırma** kartında ve Plan'daki bilanço fişinde **Plan karşılaştırmasını aç** bağlantısında yer alır.
@@ -111,4 +114,4 @@ Android uygulamasında görseller **Belgeler › Ekstrem** klasörüne kaydedili
 
 **Fişteki toplam ekstredeki dönem borcundan farklı.** Fiş net harcamayı gösterir: önceki dönem borcu ve ödemeler dahil değildir, iadeler düşülmüştür. Ekstre listesindeki "dönem borcu" bankanın yazdığı tutardır.
 
-**Yeni sürümü kurunca verilerim gider mi?** Hayır; aynı imzalı APK eskisinin üstüne kurulur. Yine de büyük güncellemelerden önce yedek almanız önerilir.
+**Yeni sürümü kurunca verilerim gider mi?** Hayır; v1.4.1'den itibaren her APK aynı anahtarla imzalanır ve eskisinin üstüne kurulur. v1.4.0 ve öncesi kuruluysa bir kereliğine: **Ayarlar → Yedekleme**'den yedek dosyası alın, uygulamayı kaldırın, yeni sürümü kurun ve yedeği geri yükleyin.

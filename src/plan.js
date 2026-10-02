@@ -216,23 +216,38 @@ function actualOf(m, pr) {
     assumed: [...L, ...I].filter(l => l.src === 'varsayıldı').length };
 }
 
+// Planın hesaba başladığı ay: başlangıç ayı sonradan ileri alınsa da önceki aylar (gerçekleşen ya da planlanan)
+// bilançoya devreder. Kullanıcı "sıfırdan başla" derse o aydan itibaren hesaplanır.
+function planAnchor() {
+  const start = planStart(), from = (S.plan.from || {})[planScope()];
+  if (from) return from > start ? start : from;
+  const floor = addM(start, -24), since = (S.plan.since || {})[planScope()];
+  const touched = Object.keys({ ...S.plan.act, ...S.plan.real }).filter(k => k.startsWith(planScope() + '|')).map(k => k.split('|')[1]);
+  const st = [...visibleItems().map(it => it.start), since, ...touched].filter(m => m && m < start && m >= floor).sort()[0];
+  return st || start;
+}
 function planCalc(monthsArg) {
   S.plan.real = S.plan.real || {}; S.plan.act = S.plan.act || {};
   const months = monthsArg || planMonths(), scope = planScope();
-  const allInst = autoInstallments(months);
-  const inst = allInst.filter(x => !S.plan.excl[x.key]);
+  const anchor = monthsArg ? months[0] : planAnchor();
+  const pre = Array.from({ length: Math.max(0, mDiff(anchor, months[0])) }, (_, i) => addM(anchor, i));
+  const allMonths = [...pre, ...months];
+  const allInstAll = autoInstallments(allMonths);
+  const allInst = allInstAll.filter(x => months.includes(x.month));
+  const inst = allInstAll.filter(x => !S.plan.excl[x.key]);
   const items = visibleItems();
-  const rows = [];
+  const all = [];
   const r2 = v => Math.round(v * 100) / 100;
-  months.forEach((m, idx) => {
+  allMonths.forEach((m, j) => {
+    const idx = j - pre.length;
     const tak = inst.filter(x => x.month === m);
     const gider = items.filter(it => it.kind === 'gider' && itemActive(it, m));
     const gelir = items.filter(it => it.kind === 'gelir' && itemActive(it, m));
     const sum = l => l.reduce((a, x) => a + x.amount, 0);
     const ck = `${scope}|${m}`;
     const carryManual = S.plan.carry[ck] != null;
-    const autoCarry = idx === 0 ? 0 : rows[idx - 1].bal;
-    const pAutoCarry = idx === 0 ? 0 : rows[idx - 1].planBal;
+    const autoCarry = j === 0 ? 0 : all[j - 1].bal;
+    const pAutoCarry = j === 0 ? 0 : all[j - 1].planBal;
     const carry = carryManual ? S.plan.carry[ck] : autoCarry;
     const pCarry = carryManual ? S.plan.carry[ck] : pAutoCarry;
     const pTak = sum(tak), pGider = sum(gider), pGelir = sum(gelir);
@@ -241,11 +256,14 @@ function planCalc(monthsArg) {
     const real = act.status === 'real';
     const takT = real ? act.takAct : pTak, giderT = real ? act.giderAct : pGider, gelirT = real ? act.gelirAct : pGelir;
     const bal = r2(gelirT + carry - takT - giderT);
-    rows.push({ m, idx, tak, takT, gider, giderT, gelir, gelirT, carry, carryManual, autoCarry, bal,
-      pTak, pGider, pGelir, pCarry, planBal, act, real });
+    all.push({ m, idx, pre: idx < 0, tak, takT, gider, giderT, gelir, gelirT, carry, carryManual, autoCarry, bal,
+      pTak, pGider, pGelir, pCarry, planBal, act, real,
+      later: items.filter(it => it.start > m && it.months !== 1 && mDiff(m, it.start) <= 2) });
   });
-  return { months, rows, inst, allInst, items, anyReal: rows.some(r => r.real) };
+  const rows = all.slice(pre.length), preRows = all.slice(0, pre.length);
+  return { months, rows, preRows, all, anchor, inst: inst.filter(x => months.includes(x.month)), allInst, items, anyReal: rows.some(r => r.real) };
 }
+const calcRow = (calc, m) => calc.all.find(x => x.m === m);
 
 /* ---------- Plan: infografikler ---------- */
 function flowChart(rows) {
@@ -333,6 +351,10 @@ function planStats(calc) {
     realTxt = `<p class="insight realnote">${names} gerçekleşti. ${Math.abs(d) < 1 ? 'Sonuç planla aynı.' :
       `Gerçekleşenlere göre dönem sonu <b>${sgn0(last.bal)} ₺</b>; ilk planda <b>${sgn0(last.planBal)} ₺</b> idi (<span class="${d < 0 ? 'neg' : 'pos'}">${sgn0(d)} ₺</span>).`}</p>`;
   }
+  if (calc.preRows.length) {
+    const c0 = rows[0].carryManual ? rows[0].carry : rows[0].autoCarry, nR = calc.preRows.filter(r => r.real).length;
+    realTxt += `<p class="insight realnote">Plan ${mLabel(calc.anchor)}'dan beri hesaplanıyor: önceki ${calc.preRows.length} ayın${nR ? ' gerçekleşen' : ''} sonucu <b class="${c0 < 0 ? 'neg' : 'pos'}">${sgn0(c0)} ₺</b> olarak ${MONTHS[+rows[0].m.slice(5) - 1]} ayına devrediyor.<span class="noexp"> Sıfırdan başlamak için bilançodaki ilk devir satırına dokun.</span></p>`;
+  }
   return `<p class="insight">${sentence}</p>${realTxt}
     <div class="stats four">
       <div class="stat"><div class="l">Toplam gelir</div><div class="v">${tl0(tg)}</div></div>
@@ -361,9 +383,13 @@ function ledgerHTML(calc) {
   return `<div class="receipt-wrap"><div class="receipt plan-rc" role="group" aria-label="Aylık bilanço">
     <div class="rc-head"><div class="shop">Ekstrem</div>
       <div class="meta">${S.plan.horizon} AYLIK PLAN · ${who}<br>${up(mLabel(rows[0].m))} – ${up(mLabel(rows[rows.length - 1].m))}</div></div>
+    ${calc.preRows.length ? `<section class="mb pre"><hr class="rc-rule"><div class="mh">ÖNCEKİ AYLAR · ${up(mLabel(calc.preRows[0].m))}'DAN BERİ</div>
+      ${Math.abs(calc.preRows[0].carry) >= 0.005 ? rcLine(`Başlangıç bakiyesi (${mShort(calc.preRows[0].m)})`, sgn(calc.preRows[0].carry)) : ''}
+      ${calc.preRows.map(r => rcLine(`${mLabel(r.m)}${r.real ? ' ✓' : r.act.status === 'waiting' || r.act.status === 'partial' ? ' (plan)' : ''}`, sgn(r.bal - r.carry))).join('')}
+      <div class="ln small"><span class="lbl">${rows[0].carryManual ? 'Başlangıç bakiyesi elle girildi' : `${MONTHS[+rows[0].m.slice(5) - 1]} ayına devreden`}</span><span class="dots"></span><span class="v">${sgn(rows[0].carryManual ? rows[0].carry : rows[0].autoCarry)}</span></div></section>` : ''}
     ${rows.map((r, i) => {
       const next = rows[i + 1] ? MONTHS[+rows[i + 1].m.slice(5) - 1] : MONTHS[+addM(r.m, 1).slice(5) - 1];
-      const cLbl = i === 0 ? 'Başlangıç bakiyesi' : `Devir (${MONTHS[+rows[i - 1].m.slice(5) - 1]})`;
+      const cLbl = i === 0 ? (calc.preRows.length ? `Devir (${MONTHS[+addM(r.m, -1).slice(5) - 1]})` : 'Başlangıç bakiyesi') : `Devir (${MONTHS[+rows[i - 1].m.slice(5) - 1]})`;
       const st = r.act.status;
       const tagTxt = r.real ? ' · GERÇEKLEŞTİ ✓' : st === 'partial' ? ' · KISMEN (EKSTRE EKSİK)' : st === 'waiting' ? ' · EKSTRE BEKLENİYOR' : '';
       return `<section class="mb ${r.real ? 'is-real' : ''}" id="mb-${r.m}"><hr class="rc-rule">
@@ -530,7 +556,11 @@ function compareBody(r, calc) {
   };
   const sharedNote = !isHane() && S.plan.items.some(it => it.scope === 'hane')
     ? `<p class="sub" style="margin-top:-2px">Ortak (hane) plan kalemleri bu kişisel görünümde yer almaz; tam karşılaştırma için Hane sekmesine geç.</p>` : '';
-  return `<p class="insight">${s}</p>${sharedNote}
+  const unplanned = lines.some(l => l.id === '__card' || l.id === '__man');
+  const later = unplanned ? (r.later || []) : [];
+  const laterNote = later.length ? `<div class="warnbox"><p class="sub" style="margin:0 0 8px"><b>${later.length} plan kalemi ${mName} ayından sonra başlıyor</b> (${later.slice(0, 4).map(it => esc(it.name) + ' · ' + mShort(it.start)).join(', ')}${later.length > 4 ? '…' : ''}), bu yüzden ${mName} planında yer almıyor ve o ayın harcamaları "plan dışı" sayılıyor. ${mName} ayını da kapsamaları gerekiyorsa başlangıçlarını öne çek.</p>
+    <button class="btn ghost block noexp" onclick="pullItems('${r.m}')">Bu kalemleri ${mName} ayından başlat</button></div>` : '';
+  return `<p class="insight">${s}</p>${laterNote}${sharedNote}
     <table class="cmptab"><thead><tr><th></th><th>Plan</th><th>Gerçekleşen</th><th>Fark</th></tr></thead><tbody>
       <tr><th>Gelir</th><td>${nf0.format(r.pGelir)}</td><td>${nf0.format(r.gelirT)}</td><td class="${dG < -0.5 ? 'neg' : dG > 0.5 ? 'pos' : ''}">${sgn0(dG)}</td></tr>
       <tr><th>Gider</th><td>${nf0.format(pX)}</td><td>${nf0.format(aX)}</td><td class="${dX > 0.5 ? 'neg' : dX < -0.5 ? 'pos' : ''}">${sgn0(dX)}</td></tr>
@@ -550,16 +580,22 @@ const statusBadge = r => r.real ? '<span class="badge">✓ Gerçekleşti</span>'
 // Özet sayfası kartı
 function planCompareCard(k) {
   if (!k || !visibleItems().length) return '';
-  const calc = planCalc(); const r = calc.rows.find(x => x.m === k);
+  const calc = planCalc(); const r = calcRow(calc, k);
   if (!r || r.act.status === 'plan') return '';
   return `<section class="card" id="ov-cmp"><h2>Plan ile karşılaştırma<small>${statusBadge(r)}</small>${r.real ? `<button class="pngbtn noexp" onclick="exportCompare('${k}')" aria-label="Karşılaştırmayı PNG kaydet">${DL_ICON}PNG</button>` : ''}</h2>
     ${compareBody(r, calc)}
     <button class="btn block noexp" style="margin-top:8px" onclick="go('plan')">Planı aç</button></section>`;
 }
 window.openCompare = m => {
-  const calc = planCalc(); const r = calc.rows.find(x => x.m === m); if (!r) return;
+  const calc = planCalc(); const r = calcRow(calc, m); if (!r) return;
   openSheet(`<h3>${mLabel(m)}: plan ve gerçekleşen</h3><div style="margin:6px 0 10px">${statusBadge(r)}</div>${compareBody(r, calc)}
     ${r.real ? `<button class="btn block" onclick="exportCompare('${m}')">${DL_ICON}PNG kaydet</button>` : ''}`);
+};
+window.pullItems = m => {
+  const r = calcRow(planCalc(), m); if (!r) return;
+  const ids = new Set(r.later.map(it => it.id));
+  S.plan.items.forEach(it => { if (ids.has(it.id)) { if (it.months) it.months += mDiff(m, it.start); it.start = m; } });
+  savePlan(); closeSheet(true); render(); toast(`${ids.size} kalem ${mLabel(m)} ayından başlıyor`);
 };
 window.setReal = (m, v) => {
   const ck = `${planScope()}|${m}`;
@@ -568,7 +604,7 @@ window.setReal = (m, v) => {
   toast(v === 'off' ? 'Bu ay plan değerleriyle hesaplanıyor' : 'Gerçekleşen değerler kullanılıyor; sonraki aylar güncellendi');
 };
 window.editActual = (m, id) => {
-  const calc = planCalc(); const r = calc.rows.find(x => x.m === m); if (!r || !r.real) return;
+  const calc = planCalc(); const r = calcRow(calc, m); if (!r || !r.real) return;
   const l = [...r.act.incLines.map(x => ({ ...x, inc: true })), ...r.act.lines].find(x => x.id === id); if (!l) return;
   const key = `${planScope()}|${m}|${id}`, has = S.plan.act[key] != null;
   openSheet(`<h3>${esc(l.name)} · ${mLabel(m)}</h3>
@@ -585,7 +621,7 @@ window.editActual = (m, id) => {
   const rs = $('#avReset'); if (rs) rs.onclick = () => { delete S.plan.act[key]; savePlan(); closeSheet(true); render(); toast('Otomatik hesaba dönüldü'); };
 };
 window.exportCompare = async m => {
-  const calc = planCalc(); const r = calc.rows.find(x => x.m === m); if (!r) return;
+  const calc = planCalc(); const r = calcRow(calc, m); if (!r) return;
   toast('Görsel hazırlanıyor…', 1500);
   try {
     const url = await renderPoster('Plan ve gerçekleşen', `${esc(isHane() ? 'Hane' : profName(S.profile))} · ${mLabel(m)}`, compareBody(r, calc));
@@ -594,7 +630,15 @@ window.exportCompare = async m => {
 };
 
 /* ---------- Plan: eylemler ---------- */
-window.setPlan = (k, v) => { S.plan[k] = v; savePlan(); render(); };
+window.setPlan = (k, v) => {
+  if (k === 'start') {
+    const sc = planScope(), cur = planStart();
+    S.plan.since = S.plan.since || {};
+    if (!S.plan.since[sc] || cur < S.plan.since[sc]) S.plan.since[sc] = cur;
+    if (S.plan.from && S.plan.from[sc] && v < S.plan.from[sc]) delete S.plan.from[sc];
+  }
+  S.plan[k] = v; savePlan(); render();
+};
 window.planFocus = m => {
   const el = document.getElementById('mb-' + m); if (!el) return;
   el.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -610,8 +654,9 @@ window.toggleInst = key => {
   $('#tiGo').onclick = () => { if (off) delete S.plan.excl[key]; else S.plan.excl[key] = true; savePlan(); closeSheet(true); render(); };
 };
 window.editCarry = m => {
-  const r = lastCalc.rows.find(x => x.m === m); if (!r) return;
-  const first = r.idx === 0;
+  const r = calcRow(lastCalc, m); if (!r) return;
+  const first = r.idx === 0 && !lastCalc.preRows.length;
+  const head = r.idx === 0, fromSet = !!(S.plan.from || {})[planScope()];
   let sign = r.carry < 0 ? -1 : 1;
   openSheet(`<h3>${first ? 'Başlangıç bakiyesi' : 'Devir'} · ${mLabel(m)}</h3>
     <p class="sub">${first ? 'Planın ilk ayına elindeki parayla (ya da borçla) başla.' : `Otomatik hesap: ${mShort(addM(m, -1))} bilançosu ${sgn(r.autoCarry)} ₺.`}
@@ -620,7 +665,11 @@ window.editCarry = m => {
       <button style="flex:1" data-sign="1" aria-pressed="${sign > 0}">Artı (gelir)</button><button style="flex:1" data-sign="-1" aria-pressed="${sign < 0}">Eksi (gider)</button></div>
     <label class="f" for="cv">Tutar (₺)</label><input class="inp" id="cv" inputmode="decimal" value="${nf.format(Math.abs(r.carry))}">
     <button class="btn block" id="cvSave">Devri kaydet</button>
-    ${r.carryManual ? `<button class="btn ghost block" id="cvAuto">Otomatik hesaba dön${first ? ' (0 ₺)' : ` (${sgn(r.autoCarry)} ₺)`}</button>` : ''}`);
+    ${r.carryManual ? `<button class="btn ghost block" id="cvAuto">Otomatik hesaba dön${first ? ' (0 ₺)' : ` (${sgn(r.autoCarry)} ₺)`}</button>` : ''}
+    ${head && lastCalc.preRows.length ? `<hr class="rc-rule"><p class="sub">Bu devir ${mLabel(lastCalc.anchor)}'dan beri ayların sonucudur. Önceki ayları saymadan, ${mLabel(m)} ayından sıfırdan başlayabilirsin.</p>
+      <button class="btn ghost block" id="cvFresh">Sıfırdan başla (önceki ayları sayma)</button>` : ''}
+    ${head && fromSet && !lastCalc.preRows.length ? `<hr class="rc-rule"><p class="sub">Plan ${mLabel(m)} ayından sıfırdan hesaplanıyor.</p>
+      <button class="btn ghost block" id="cvPrev">Önceki ayların sonucunu devret</button>` : ''}`);
   document.querySelectorAll('[data-sign]').forEach(b => b.onclick = () => { sign = +b.dataset.sign; document.querySelectorAll('[data-sign]').forEach(x => x.setAttribute('aria-pressed', x === b)); });
   const ck = `${planScope()}|${m}`;
   $('#cvSave').onclick = () => {
@@ -628,6 +677,9 @@ window.editCarry = m => {
     if (!isFinite(v)) return toast('Geçerli bir tutar gir, örneğin 2.500,00');
     S.plan.carry[ck] = sign * Math.abs(v); savePlan(); closeSheet(true); render(); toast('Devir güncellendi; sonraki aylar yeniden hesaplandı');
   };
+  const sc = planScope();
+  const fr = $('#cvFresh'); if (fr) fr.onclick = () => { S.plan.from = S.plan.from || {}; S.plan.from[sc] = m; delete S.plan.carry[ck]; savePlan(); closeSheet(true); render(); toast(`Plan ${mLabel(m)} ayından sıfırdan hesaplanıyor`); };
+  const pv = $('#cvPrev'); if (pv) pv.onclick = () => { delete S.plan.from[sc]; delete S.plan.carry[ck]; savePlan(); closeSheet(true); render(); toast('Önceki ayların sonucu devrediliyor'); };
   const au = $('#cvAuto'); if (au) au.onclick = () => { delete S.plan.carry[ck]; savePlan(); closeSheet(true); render(); toast('Devir otomatik hesaba döndü'); };
 };
 window.addSuggestion = i => {

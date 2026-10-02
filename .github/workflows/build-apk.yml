@@ -3,7 +3,6 @@ on:
   workflow_dispatch:
   push:
     branches: [ main ]
-    tags: [ 'v*' ]
   release:
     types: [ published ]
 permissions:
@@ -38,25 +37,39 @@ jobs:
           M=android/app/src/main/AndroidManifest.xml
           sed -i 's#<application#<application android:requestLegacyExternalStorage="true"#' $M
           sed -i 's#</manifest>#    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="29" />\n</manifest>#' $M
-          mkdir -p ~/.android && cp keystore/debug.keystore ~/.android/debug.keystore
+          # Her derlemede aynı anahtar: Gradle'ın debug imzasını depodaki anahtara bağla.
+          # (~/.android'e kopyalamak yetmiyor; runner ANDROID_USER_HOME'u başka yere yönlendiriyor.)
+          cat >> android/app/build.gradle <<'GRADLE'
+
+          android.signingConfigs.debug.storeFile = rootProject.file("../keystore/debug.keystore")
+          android.signingConfigs.debug.storePassword = "android"
+          android.signingConfigs.debug.keyAlias = "androiddebugkey"
+          android.signingConfigs.debug.keyPassword = "android"
+          GRADLE
       - name: APK derle
         run: |
           cd android
           chmod +x gradlew
           ./gradlew assembleDebug --no-daemon
           cp app/build/outputs/apk/debug/app-debug.apk "../Ekstrem-v${VERSION}.apk"
+      - name: İmzayı doğrula
+        run: |
+          WANT=$(keytool -list -v -keystore keystore/debug.keystore -storepass android | grep -m1 'SHA256:' | awk '{print $2}')
+          GOT=$(keytool -printcert -jarfile "Ekstrem-v${VERSION}.apk" | grep -m1 'SHA256:' | awk '{print $2}')
+          echo "beklenen: $WANT"; echo "APK:      $GOT"
+          test -n "$WANT" && test "$WANT" = "$GOT"
       - uses: actions/upload-artifact@v4
         with:
           name: Ekstrem-apk
           path: Ekstrem-v*.apk
       - name: Sürüm notları
-        if: startsWith(github.ref, 'refs/tags/v')
+        if: github.event_name == 'release'
         run: |
           awk -v v="## v${VERSION}" 'index($0,v)==1{f=1;next} /^## /{f=0} f' CHANGELOG.md > notlar.md
           printf '\n---\nKurulum: APK dosyasını telefona indirip açın. Yeni sürüm eskisinin üstüne kurulur, veriler korunur.\n' >> notlar.md
           cat notlar.md
       - name: Releases sayfasında yayımla
-        if: startsWith(github.ref, 'refs/tags/v')
+        if: github.event_name == 'release'
         uses: softprops/action-gh-release@v2
         with:
           name: Ekstrem v${{ env.VERSION }}
