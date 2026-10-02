@@ -74,9 +74,12 @@ APK, GitHub Actions'ta `.github/workflows/build-apk.yml` ile derlenir:
 | Tetikleyici | Sonuç |
 |---|---|
 | `main` dalına gönderim ya da **Run workflow** | APK, çalışmanın **Artifacts** bölümünde `Ekstrem-apk` olarak |
-| `v*` biçiminde etiket (ör. `v1.3.0`) | Ayrıca [Releases](../../releases) sayfasında `Ekstrem-v1.3.0.apk` olarak yayımlanır; notlar CHANGELOG.md'den alınır |
+| `v*` biçiminde etiket (ör. `v1.3.0`) ya da yayımlanan bir sürüm | Ayrıca [Releases](../../releases) sayfasında `Ekstrem-v1.3.0.apk` olarak yayımlanır; notlar CHANGELOG.md'den alınır |
 
-Yeni sürüm yayımlamak:
+Yeni sürüm yayımlamak için iki yol vardır:
+
+- GitHub'da **Releases → Draft a new release**, etiket olarak `v1.3.0` yazıp **Publish release**. İş akışı APK'yı derleyip bu sürüme ekler.
+- Ya da komut satırından:
 
 ```bash
 git tag v1.3.0
