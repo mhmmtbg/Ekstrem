@@ -1,0 +1,13 @@
+# Bağımlılıklar ve derleme çıktıları
+node_modules/
+src/node_modules/
+src/dist/
+android/
+*.apk
+*.aab
+notlar.md
+# Kişisel veriler: ekstreler ve yedekler depoya eklenmez
+*.pdf
+ekstrem-yedek-*.json
+.DS_Store
+Thumbs.db

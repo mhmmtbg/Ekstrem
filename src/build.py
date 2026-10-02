@@ -25,6 +25,10 @@ fonts='<style>'+''.join([ff('Bricolage Grotesque Variable',B+'latin-standard-nor
   ff('IBM Plex Mono',M+'latin-400-normal.woff2',LAT,'400'),ff('IBM Plex Mono',M+'latin-ext-400-normal.woff2',EXT,'400'),
   ff('IBM Plex Mono',M+'latin-600-normal.woff2',LAT,'600'),ff('IBM Plex Mono',M+'latin-ext-600-normal.woff2',EXT,'600')])+'</style>'
 h=h.replace('<!--FONTS-->',fonts)
+h=h.replace('<title>Ekstrem</title>','<title>Ekstrem</title>\n<link rel="manifest" href="manifest.json">\n<link rel="icon" href="icon-192.png">',1)
 import os; os.makedirs('dist',exist_ok=True)
+# Depo içinde (src/) çalıştırılınca uygulama doğrudan ../www/index.html olarak da yazılır
+if os.path.isdir('../www') and os.path.isfile('../www/manifest.json'):
+    open('../www/index.html','w',encoding='utf-8').write(h)
 open('dist/index.html','w',encoding='utf-8').write(h)
 print(len(h)//1024,'KB')

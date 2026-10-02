@@ -141,7 +141,7 @@
     for (const t of tx) {
       const all = t.desc + ' ' + (t.extra || '');
       let m;
-      if ((m = all.match(/\(([\d.,]+)\s*TL\)\s*(\d+)\s*\/\s*(\d+)\s*\.?\s*taksit/i))) {          // Axess: (10.004,10 TL) 9/4.taksit
+      if ((m = all.match(/\(([\d.,]+)\s*TL\)\s*(\d+)\s*\/\s*(\d+)\s*\.?\s*taksit/i))) {          // Axess: (12.000,00 TL) 6/2.taksit
         t.taksitTutar = toNum(m[1]); t.taksitToplam = +m[2]; t.taksitNo = +m[3];
       } else if ((m = all.match(/([\d.,]+)\s*TL'?l[iı]k\s*i[sş]lemin\s*(\d+)\s*\/\s*(\d+)\s*taksidi/i))) { // YKB
         t.taksitTutar = toNum(m[1]); t.taksitNo = +m[2]; t.taksitToplam = +m[3];

@@ -1,0 +1,4 @@
+* text=auto
+*.png binary
+*.keystore binary
+www/index.html -diff linguist-generated
