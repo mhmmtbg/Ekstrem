@@ -802,8 +802,9 @@ function openSettings() {
     <ul class="list-plain">${S.statements.slice().reverse().map(s => `<li><span>${esc(s.manual ? 'Kart dışı harcamalar' : s.bank)} · ${mLabel(s.month)}<br><span class="sub">${esc(profName(s.profile))} · ${s.tx.length} ${s.manual ? 'kayıt' : 'satır · kesim ' + dTR(s.kesim)}</span></span><button class="trash" aria-label="Sil" data-st="${s.id}"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg></button></li>`).join('') || '<li class="sub">Yok</li>'}</ul>
     <label class="f">Yedekleme</label>
     <p class="sub" style="margin:0 0 6px">Veriler yalnızca bu telefonda (${Store.mode}) saklanır. Uygulamayı silmeden önce yedek al.</p>
-    <button class="btn ghost block" id="bkDl">Yedeği dosya olarak indir</button>
+    <button class="btn ghost block" id="bkDl">Yedeği dosya olarak kaydet ve paylaş</button>
     <button class="btn ghost block" id="bkCp">Yedeği panoya kopyala</button>
+    ${isNative() ? '<p class="sub" style="margin:6px 0 0">Uygulama arka plana alındığında yedek kendiliğinden Belgeler › Ekstrem › ekstrem-otomatik-yedek.json dosyasına yazılır.</p>' : ''}
     <button class="btn ghost block" id="bkIn">Yedekten geri yükle</button>
     <button class="btn danger block" id="wipe">Tüm verileri sil</button>
     <button class="btn block" id="setSave">Kaydet ve kapat</button>`);
@@ -826,21 +827,20 @@ function openSettings() {
     await saveKV('profiles', S.profiles); await saveKV('cards', S.cards); await saveKV('cardProfile', S.cardProfile);
     closeSheet(true); render();
   };
-  const backup = () => JSON.stringify({ app: 'ekstrem', v: 2, at: new Date().toISOString(), statements: S.statements, incomes: S.incomes,
-    rules: S.rules, cards: S.cards, cardProfile: S.cardProfile, profiles: S.profiles, plan: S.plan, theme: S.theme });
-  $('#bkDl').onclick = () => {
-    const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([backup()], { type: 'application/json' }));
-    a.download = 'ekstrem-yedek-' + new Date().toISOString().slice(0, 10) + '.json'; document.body.appendChild(a); a.click(); a.remove();
-    toast('İndirme başlamadıysa "panoya kopyala"yı kullan', 4000);
+  $('#bkDl').onclick = async () => {
+    const name = 'ekstrem-yedek-' + new Date().toISOString().slice(0, 10) + '.json';
+    await saveTextFile(backupJSON(), name, 'application/json');
   };
   $('#bkCp').onclick = async () => {
-    try { await navigator.clipboard.writeText(backup()); toast('Yedek panoya kopyalandı; not uygulamasına yapıştırıp sakla', 4000); }
-    catch (e) { openSheet(`<h3>Yedek metni</h3><p class="sub">Tümünü seçip kopyala.</p><textarea class="inp" readonly onfocus="this.select()">${esc(backup())}</textarea><button class="btn block" onclick="closeSheet()">Kapat</button>`); }
+    const txt = backupJSON();
+    try { await navigator.clipboard.writeText(txt); toast('Yedek panoya kopyalandı. Uzun metinleri mesaj uygulamaları bölebilir; mümkünse dosya olarak kaydet.', 5000); }
+    catch (e) { openSheet(`<h3>Yedek metni</h3><p class="sub">Tümünü seçip kopyala.</p><textarea class="inp" readonly onfocus="this.select()">${esc(txt)}</textarea><button class="btn block" onclick="closeSheet()">Kapat</button>`); }
   };
   $('#bkIn').onclick = () => {
     openSheet(`<h3>Yedekten geri yükle</h3><p class="sub">Yedek dosyasını seç ya da yedek metnini yapıştır. Mevcut verilerin yerine geçer.</p>
     <button class="btn ghost block" onclick="document.getElementById('fileJson').click()">Yedek dosyası seç</button>
     <textarea class="inp" id="bkText" placeholder="veya yedek metnini buraya yapıştır" style="margin-top:10px"></textarea>
+    <p class="sub" style="margin:6px 0 0">Metin kopyalanırken bozulduysa, okunabilen kayıtlar kurtarılır ve yalnızca bozuk kayıtlar atlanır.</p>
     <button class="btn block" id="bkGo">Geri yükle</button>`);
     $('#bkGo').onclick = () => restore($('#bkText').value);
   };
@@ -850,16 +850,134 @@ function openSettings() {
     await load(); closeSheet(true); render();
   };
 }
+/* ---------- Yedek ---------- */
+const isNative = () => !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform() && window.Capacitor.nativePromise);
+const backupJSON = () => JSON.stringify({ app: 'ekstrem', v: 2, at: new Date().toISOString(), statements: S.statements, incomes: S.incomes,
+  rules: S.rules, cards: S.cards, cardProfile: S.cardProfile, profiles: S.profiles, plan: S.plan, theme: S.theme });
+async function saveTextFile(text, name, mime) {
+  const cap = window.Capacitor;
+  if (isNative()) {
+    try {
+      const r = await cap.nativePromise('Filesystem', 'writeFile', { path: 'Ekstrem/' + name, data: text, directory: 'DOCUMENTS', encoding: 'utf8', recursive: true });
+      openSheet(`<h3>Yedek kaydedildi</h3><p class="sub">Telefonda Belgeler › Ekstrem klasörüne kaydedildi: ${esc(name)}</p>
+        <p class="sub">Yedeği telefon dışında da saklamak için Drive'a ya da kendine e-postayla gönder.</p>
+        <button class="btn block" id="bkShare">Paylaş (Drive, e-posta…)</button><button class="btn ghost block" onclick="closeSheet()">Kapat</button>`);
+      $('#bkShare').onclick = async () => {
+        try { await cap.nativePromise('Share', 'share', { title: name, files: [r.uri], dialogTitle: 'Yedeği paylaş' }); }
+        catch (e) { if (!/cancel|abort/i.test(String(e && (e.message || e.name)))) toast('Paylaşım açılamadı: ' + (e.message || e), 4000); }
+      };
+      return;
+    } catch (e) { console.error(e); }
+  }
+  let file = null; try { file = new File([text], name, { type: mime }); } catch (e) { /* eski tarayıcı */ }
+  if (file && navigator.canShare && navigator.canShare({ files: [file] })) {
+    try { await navigator.share({ files: [file], title: name }); return; } catch (e) { if (/abort|cancel/i.test(String(e && (e.name || e.message)))) return; }
+  }
+  const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([text], { type: mime })); a.download = name;
+  document.body.appendChild(a); a.click(); a.remove();
+  toast('İndirme başlamadıysa "panoya kopyala"yı kullan', 4000);
+}
+// Uygulama arka plana alınınca otomatik yedek (yalnızca Android uygulamasında)
+let autoBackupBusy = false;
+document.addEventListener('visibilitychange', async () => {
+  if (document.visibilityState !== 'hidden' || !isNative() || autoBackupBusy || !S.statements.length) return;
+  autoBackupBusy = true;
+  try { await window.Capacitor.nativePromise('Filesystem', 'writeFile', { path: 'Ekstrem/ekstrem-otomatik-yedek.json', data: backupJSON(), directory: 'DOCUMENTS', encoding: 'utf8', recursive: true }); }
+  catch (e) { /* otomatik yedek isteğe bağlı */ } finally { autoBackupBusy = false; }
+});
+
+// Yedek metnini çöz: önce olduğu gibi, sonra temizleyerek, en son kayıt kayıt kurtararak
+function parseBackup(raw) {
+  let t = String(raw || '').replace(/^﻿/, '').replace(/[​-‍⁠­]/g, '').replace(/[“”„″]/g, '"').trim();
+  const first = t.indexOf('{'); if (first > 0) t = t.slice(first);
+  const tries = [t, t.replace(/[\r\n\t]+/g, ''), t.replace(/[\r\n\t]+/g, '').replace(/\s*$/, '').replace(/[^}\]]*$/, '')];
+  for (const s of tries) { try { const d = JSON.parse(s); return { data: d, salvaged: false }; } catch (e) { /* sıradaki yöntem */ } }
+  return { data: salvageBackup(t.replace(/[\r\n\t]+/g, '')), salvaged: true };
+}
+// Dengeli parantezli JSON değerini dizgi kaçışlarına dikkat ederek kes
+function cutValue(s, start) {
+  const open = s[start], close = open === '{' ? '}' : open === '[' ? ']' : null;
+  if (!close) { const m = s.slice(start).match(/^"(?:[^"\\]|\\.)*"|^[^,}\]]+/); return m ? m[0] : null; }
+  let depth = 0, inStr = false;
+  for (let i = start; i < s.length; i++) {
+    const c = s[i];
+    if (inStr) { if (c === '\\') i++; else if (c === '"') inStr = false; continue; }
+    if (c === '"') inStr = true; else if (c === open) depth++; else if (c === close && --depth === 0) return s.slice(start, i + 1);
+  }
+  return null;
+}
+const tryJSON = s => { try { return JSON.parse(s); } catch (e) { return undefined; } };
+function splitItems(body) { return body.split(/\}\s*,\s*\{(?=")/).map((p, i, arr) => (i ? '{' : '') + p + (i < arr.length - 1 ? '}' : '')); }
+function salvageBackup(s) {
+  if (!/"app"\s*:\s*"ekstrem"/.test(s)) throw new Error('Bu bir Ekstrem yedeği değil ya da metnin başı eksik.');
+  const out = { app: 'ekstrem', statements: [], incomes: [], lostStatements: 0, lostTx: 0, lostIncomes: 0 };
+  const keyAt = k => { const m = s.match(new RegExp('"' + k + '"\\s*:\\s*')); return m ? m.index + m[0].length : -1; };
+  // Ekstreler: her ekstre {"id":"..." ile başlar
+  const sStart = keyAt('statements'), iStart = keyAt('incomes');
+  if (sStart >= 0) {
+    const region = s.slice(sStart + 1, iStart > sStart ? iStart : s.length);
+    const starts = []; const re = /\{"id"\s*:/g; let m;
+    while ((m = re.exec(region))) starts.push(m.index);
+    starts.forEach((st, k) => {
+      let chunk = region.slice(st, k + 1 < starts.length ? starts[k + 1] : region.length).replace(/[\s,\]]*("incomes"\s*:\s*)?$/, '').replace(/,\s*$/, '');
+      const whole = tryJSON(chunk) || tryJSON(chunk + '}') || tryJSON(chunk.replace(/\}\s*\]?\s*$/, '}'));
+      if (whole && whole.id && Array.isArray(whole.tx)) { out.statements.push(whole); return; }
+      // Ekstrenin kendisi bozuk: başlığı ve sağlam işlemleri ayrı ayrı al
+      const tp = chunk.search(/"tx"\s*:\s*\[/); if (tp < 0) { out.lostStatements++; return; }
+      const bodyStart = chunk.indexOf('[', tp) + 1, bodyEnd = chunk.lastIndexOf('}]');
+      const header = tryJSON(chunk.slice(0, tp) + '"tx":[]' + (bodyEnd > bodyStart ? chunk.slice(bodyEnd + 2) : '}')) ||
+        tryJSON(chunk.slice(0, tp).replace(/,\s*$/, '') + '}');
+      if (!header || !header.id) { out.lostStatements++; return; }
+      const items = bodyEnd > bodyStart ? splitItems(chunk.slice(bodyStart, bodyEnd + 1)) : [];
+      header.tx = [];
+      items.forEach(p => { const t = tryJSON(p); if (t && t.date && typeof t.tl === 'number') header.tx.push(t); else out.lostTx++; });
+      header.ok = header.manual ? header.ok : null;   // toplam artık doğrulanamaz
+      out.statements.push(header);
+    });
+  }
+  if (iStart >= 0 && s[iStart] === '[') {
+    const arr = cutValue(s, iStart);
+    const body = arr ? arr.slice(1, -1) : s.slice(iStart + 1, (s.slice(iStart).search(/\]\s*,\s*"(rules|cards|plan)"/) + iStart) || s.length);
+    splitItems(body.trim()).forEach(p => { if (!p.trim()) return; const v = tryJSON(p); if (v && v.month && typeof v.amount === 'number') out.incomes.push(v); else out.lostIncomes++; });
+  }
+  for (const k of ['rules', 'cards', 'cardProfile', 'profiles', 'plan', 'theme']) {
+    const p = keyAt(k); if (p < 0) continue;
+    const v = cutValue(s, p); const d = v != null ? tryJSON(v) : undefined;
+    if (d !== undefined) out[k] = d;
+  }
+  if (!out.statements.length && !out.incomes.length) throw new Error('Yedek metninden okunabilen kayıt çıkmadı.');
+  return out;
+}
 async function restore(text) {
+  let res;
+  try { res = parseBackup(text); }
+  catch (e) { toast('Geri yükleme başarısız: ' + e.message + ' Yedeği dosya olarak taşımayı dene.', 6000); return; }
+  const d = res.data;
+  if (!d || d.app !== 'ekstrem') { toast('Geri yükleme başarısız: bu bir Ekstrem yedeği değil.', 5000); return; }
+  const nTx = (d.statements || []).reduce((a, s) => a + (s.tx || []).length, 0);
+  if (res.salvaged) {
+    const lost = [d.lostStatements ? `${d.lostStatements} ekstre` : '', d.lostTx ? `${d.lostTx} işlem` : '', d.lostIncomes ? `${d.lostIncomes} gelir kaydı` : ''].filter(Boolean).join(', ');
+    const ok = await new Promise(r => {
+      openSheet(`<h3>Yedek metni bozuk</h3>
+        <p>Metin kopyalanırken bozulmuş; okunabilen kayıtlar kurtarıldı.</p>
+        <ul class="list-plain"><li><span>Kurtarılan ekstre</span><b>${(d.statements || []).length}</b></li>
+          <li><span>Kurtarılan işlem</span><b>${nTx}</b></li><li><span>Kurtarılan gelir kaydı</span><b>${(d.incomes || []).length}</b></li>
+          ${lost ? `<li><span>Okunamayıp atlanan</span><b class="neg">${lost}</b></li>` : ''}</ul>
+        <p class="sub">Bozuk ekstreleri PDF'ten yeniden yükleyerek tamamlayabilirsin. Kurtarılanlar mevcut verilerin yerine geçer.</p>
+        <button class="btn block" id="svOk">Kurtarılanları yükle</button><button class="btn ghost block" id="svNo">Vazgeç</button>`, () => r(false));
+      $('#svOk').onclick = () => { closeSheet(true); r(true); };
+      $('#svNo').onclick = () => { closeSheet(true); r(false); };
+    });
+    if (!ok) return;
+  }
   try {
-    const d = JSON.parse(text);
-    if (d.app !== 'ekstrem') throw new Error('Bu bir Ekstrem yedeği değil.');
     await Promise.all(['statements', 'incomes', 'kv'].map(s => Store.clear(s)));
     for (const s of d.statements || []) await Store.put('statements', s);
     for (const i of d.incomes || []) await Store.put('incomes', i);
     for (const k of ['rules', 'cards', 'cardProfile', 'profiles', 'plan', 'theme']) if (d[k]) await saveKV(k, d[k]);
-    await load(); closeSheet(true); render(); toast('Yedek geri yüklendi');
-  } catch (e) { toast('Geri yükleme başarısız: ' + e.message, 4000); }
+    await load(); closeSheet(true); render();
+    toast(`Yedek geri yüklendi: ${(d.statements || []).length} ekstre, ${nTx} işlem`, 4000);
+  } catch (e) { toast('Geri yükleme başarısız: ' + e.message, 5000); }
 }
 
 /* ---------- Başlat ---------- */

@@ -26,10 +26,17 @@ Tüm veriler yalnızca telefonda saklanır; hiçbir sunucuya gönderilmez.
 
 | Banka | Durum |
 |---|---|
-| Ziraat Bankkart | Tam destek (TL ve USD işlemler, Bankkart Lira) |
-| Akbank Axess | Tam destek (bankanın EBCDIC kodlu PDF metni çözülür) |
-| Yapı Kredi World | Tam destek (ana kart ve dijital kart, alt satıra yazılan taksitler) |
-| Diğer bankalar | Tablo düzenindeki ekstreler genel ayrıştırıcıyla okunmaya çalışılır. Toplam tutmazsa içe aktarma ekranı uyarır. |
+| Ziraat Bankkart | Gerçek ekstrelerle test edildi (TL ve USD işlemler, Bankkart Lira) |
+| Akbank Axess | Gerçek ekstreyle test edildi (bankanın EBCDIC kodlu PDF metni çözülür) |
+| Yapı Kredi World | Gerçek ekstreyle test edildi (ana kart, dijital kart, alt satırdaki taksitler) |
+| Halkbank Paraf | Gerçek ekstreyle test edildi (çok satırlı açıklamalar, sayfa geçişi) |
+| DenizBank | Gerçek ekstreyle test edildi (`895,99/3-2` biçimli taksitler) |
+| Enpara.com | Gerçek ekstrelerle test edildi (eski ve yeni düzen) |
+| İş Bankası Maximum | Ekstre görüntülerinden kurulan düzenle test edildi (`4/8 taksidi` biçimi) |
+| Garanti BBVA Bonus | Ekstre görüntülerinden kurulan düzenle test edildi (tarihsiz faiz/BSMV satırları) |
+| QNB, VakıfBank, TEB, ING, Kuveyt Türk, Türkiye Finans, Albaraka, Ziraat Katılım, Vakıf Katılım, Emlak Katılım, Şekerbank, Fibabanka, Odeabank, HSBC, Anadolubank, Burgan, Alternatif Bank, Papara | Banka adı tanınır; tablo düzenindeki ekstre genel ayrıştırıcıyla okunur. Test ekstresi olmadığından doğruluk garanti değildir. |
+
+Her ekstre yüklenirken bankanın dönem borcuyla karşılaştırılır (`önceki borç + harcamalar − ödemeler/iadeler = dönem borcu`). Toplam tutmazsa içe aktarma ekranı uyarır; böyle bir ekstreyi [issue](../../issues) olarak bildirebilirsiniz (kişisel bilgileri karartarak).
 
 ## İndirme ve kurulum
 
@@ -84,7 +91,7 @@ PNG çıktısı örnekleri:
 ## Gizlilik
 
 - Ekstreler telefonda okunur; PDF'ler ve işlemler hiçbir sunucuya gönderilmez. Uygulamanın bir sunucusu, hesabı ya da analitiği yoktur.
-- Veriler uygulamanın kendi deposunda (IndexedDB) durur. Uygulama silinirse veriler de silinir; **Ayarlar → Yedekleme** ile yedek alınabilir.
+- Veriler uygulamanın kendi deposunda (IndexedDB) durur. Uygulama silinirse veriler de silinir; **Ayarlar → Yedekleme** ile yedek dosyası alınabilir. Android uygulaması ayrıca her kapanışta **Belgeler › Ekstrem › ekstrem-otomatik-yedek.json** dosyasına otomatik yedek yazar.
 - Yedek dosyası tüm işlemlerinizi içerir; paylaşırken dikkat edin.
 
 ## Depo yapısı
@@ -95,7 +102,7 @@ src/                 Uygulamanın kaynak kodu (HTML, CSS, JavaScript)
   app.js             Özet, işlemler, aylar, ekleme, ayarlar, içe aktarma
   plan.js            Plan, gerçekleşme karşılaştırması, tema, PNG çıktısı
   parser.js          Ziraat Bankkart ayrıştırıcısı
-  generic.js         Genel ayrıştırıcı (Akbank Axess, Yapı Kredi World ve diğerleri)
+  generic.js         Genel ayrıştırıcı (Ziraat dışındaki tüm bankalar)
   cats.js            Kategori kuralları
   build.py           Hepsini tek dosyalık www/index.html olarak birleştirir
 www/                 Derlenmiş uygulama (APK'nın içine giren tek HTML dosyası, ikonlar)

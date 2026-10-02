@@ -1,5 +1,13 @@
 # Değişiklik Günlüğü
 
+## v1.4.0 — 2026-10-02
+
+- Yeni bankalar: Halkbank Paraf, DenizBank, Enpara.com, İş Bankası Maximum, Garanti BBVA Bonus; QNB, VakıfBank, TEB, ING, Kuveyt Türk ve diğer bankaların tanınması
+- Genel ayrıştırıcı yeniden yazıldı: iki satıra bölünen tablo başlıkları, çok satırlı açıklamalar, tarihsiz faiz/BSMV satırları, `+`/`CR`/`(-)` ile gösterilen alacaklar, farklı tarih biçimleri, farklı bankaların taksit yazımları, sayfa geçişinde tekrarlanan satırlar
+- Yedek geri yükleme düzeltildi: mesaj uygulamalarında bozulan yedek metni artık kayıt kayıt kurtarılıyor, okunamayan kayıtlar raporlanıyor
+- Yedek artık dosya olarak kaydediliyor ve paylaşılıyor (Belgeler › Ekstrem)
+- Android'de uygulama kapanırken otomatik yedek
+
 ## v1.3.0 — 2026-10-02
 
 - Plan ile gerçekleşen karşılaştırması: ekstresi yüklenen ay "gerçekleşti" sayılır; plan kalemleri ekstre, kart dışı kayıt ve girilen gelirlerle eşleştirilir

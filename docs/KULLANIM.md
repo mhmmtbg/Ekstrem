@@ -101,7 +101,9 @@ Android uygulamasında görseller **Belgeler › Ekstrem** klasörüne kaydedili
 - **Kişiler:** Ben ve Eşim adları değiştirilebilir.
 - **Kartlar:** Kartlara ad verilir, sahibi değiştirilir.
 - **Kategori kuralları** ve **yüklü ekstreler** listelenir, silinebilir.
-- **Yedekleme:** Yedek dosya olarak indirilir ya da panoya kopyalanır; dosyadan ya da yapıştırılan metinden geri yüklenir. Geri yükleme mevcut verilerin yerine geçer.
+- **Yedekleme:** **Yedeği dosya olarak kaydet ve paylaş** yedeği Android'de **Belgeler › Ekstrem** klasörüne yazar ve paylaşım menüsünü açar (Drive, e-posta…). Geri yükleme dosyadan ya da yapıştırılan metinden yapılır ve mevcut verilerin yerine geçer.
+  - Android uygulaması her kapanışta **Belgeler › Ekstrem › ekstrem-otomatik-yedek.json** dosyasına otomatik yedek yazar.
+  - Yedeği metin olarak WhatsApp gibi uygulamalarla taşımak önerilmez: uzun metin bölünebilir ya da bozulabilir. Bozuk bir metin yüklenirse okunabilen ekstreler kurtarılır ve kaç kaydın atlandığı gösterilir; eksik ekstreler PDF'ten yeniden yüklenebilir.
 
 ## Sık sorulanlar
 
