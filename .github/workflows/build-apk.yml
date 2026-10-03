@@ -37,6 +37,9 @@ jobs:
           M=android/app/src/main/AndroidManifest.xml
           sed -i 's#<application#<application android:requestLegacyExternalStorage="true"#' $M
           sed -i 's#</manifest>#    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="29" />\n</manifest>#' $M
+          # Paylaş → Ekstrem: başka uygulamalardan PDF paylaşımı
+          sed -i 's#</application>#    <activity android:name="de.mindlib.sendIntent.SendIntentActivity" android:label="@string/app_name" android:exported="true" android:theme="@style/AppTheme.NoActionBar">\n            <intent-filter>\n                <action android:name="android.intent.action.SEND" />\n                <action android:name="android.intent.action.SEND_MULTIPLE" />\n                <category android:name="android.intent.category.DEFAULT" />\n                <data android:mimeType="application/pdf" />\n            </intent-filter>\n        </activity>\n    </application>#' $M
+          grep -n "SendIntentActivity" $M
           # Her derlemede aynı anahtar: Gradle'ın debug imzasını depodaki anahtara bağla.
           # (~/.android'e kopyalamak yetmiyor; runner ANDROID_USER_HOME'u başka yere yönlendiriyor.)
           cat >> android/app/build.gradle <<'GRADLE'

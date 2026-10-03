@@ -6,7 +6,8 @@ def app_with_plan():
     a=open('app.js',encoding='utf-8').read(); pl=open('plan.js',encoding='utf-8').read()
     mk='/* ---------- Başlat ---------- */'
     assert mk in a
-    a=a.replace(mk, pl+'\n'+mk)
+    fe=open('features.js',encoding='utf-8').read()
+    a=a.replace(mk, pl+'\n'+fe+'\n'+mk)
     return '<script>\n'+a.replace('</script','<\\/script')+'\n</script>'
 h=open('src.html',encoding='utf-8').read()
 h=h.replace('<!--PDFJS-->',s('node_modules/pdfjs-dist/build/pdf.min.js'))

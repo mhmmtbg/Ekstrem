@@ -226,7 +226,7 @@ function planAnchor() {
   const st = [...visibleItems().map(it => it.start), since, ...touched].filter(m => m && m < start && m >= floor).sort()[0];
   return st || start;
 }
-function planCalc(monthsArg) {
+function planCalc(monthsArg, extraItems) {
   S.plan.real = S.plan.real || {}; S.plan.act = S.plan.act || {};
   const months = monthsArg || planMonths(), scope = planScope();
   const anchor = monthsArg ? months[0] : planAnchor();
@@ -235,7 +235,7 @@ function planCalc(monthsArg) {
   const allInstAll = autoInstallments(allMonths);
   const allInst = allInstAll.filter(x => months.includes(x.month));
   const inst = allInstAll.filter(x => !S.plan.excl[x.key]);
-  const items = visibleItems();
+  const items = visibleItems().concat(extraItems || []);
   const all = [];
   const r2 = v => Math.round(v * 100) / 100;
   allMonths.forEach((m, j) => {
@@ -478,11 +478,11 @@ function itemsCard() {
   const sug = suggestions();
   const row = it => `<li onclick="editPlanItem('${it.id}')" style="cursor:pointer"><span style="min-width:0"><b>${esc(it.name)}</b>${isHane() ? `<span class="pill">${esc(scopeLabel(it.scope))}</span>` : ''}<br><span class="sub">${spanText(it)}</span></span>
     <b class="${it.kind === 'gelir' ? 'pos' : ''}" style="white-space:nowrap">${it.kind === 'gelir' ? '+' : '−'}${nf.format(it.amount)}</b></li>`;
-  return `<section class="card"><h2>Plan kalemleri<small>dokun, düzenle</small></h2>
+  return `<p class="sub" style="margin:0 0 8px">Kaleme dokunup düzenleyebilirsin.</p>
     ${sug.length ? `<div class="sugs"><span class="sub">Öneriler:</span>${sug.map((s, i) => `<button class="chip sug" onclick="addSuggestion(${i})">+ ${esc(s.txt)}</button>`).join('')}</div>` : ''}
     ${items.length ? `<ul class="list-plain">${items.map(row).join('')}</ul>` : '<p class="sub">Henüz gelir ya da gider eklemedin.</p>'}
     <div class="row" style="gap:8px;margin-top:12px"><button class="btn ghost" style="flex:1" onclick="editPlanItem(null,'gelir')">+ Gelir</button>
-      <button class="btn ghost" style="flex:1" onclick="editPlanItem(null,'gider')">+ Gider</button></div></section>`;
+      <button class="btn ghost" style="flex:1" onclick="editPlanItem(null,'gider')">+ Gider</button></div>`;
 }
 
 let lastCalc = null;
@@ -499,26 +499,31 @@ function viewPlan() {
     <div class="seg" role="group" aria-label="Plan süresi">${[3, 6, 12].map(n => `<button aria-pressed="${S.plan.horizon === n}" onclick="setPlan('horizon',${n})">${n} ay</button>`).join('')}</div>
   </div>
 
+  <div class="actrow">
+    <button class="btn ghost" onclick="openSimulator()">Bunu alırsam?</button>
+    <button class="btn ghost" onclick="go('hedef')">Hedefler</button>
+    <button class="btn ghost" onclick="openExportMenu()">${DL_ICON}Görseller</button>
+  </div>
+
   <section class="card" id="pv-flow"><h2>Nakit akışı<small>${range}</small><button class="pngbtn noexp" onclick="exportPlanPart('akis')" aria-label="Nakit akışını PNG kaydet">${DL_ICON}PNG</button></h2>
     ${planStats(calc)}
     ${flowChart(rows)}
     ${flowLegend(rows)}
-    <p class="sub noexp" style="margin:8px 0 0">Bir aya dokununca o ayın bilançosuna gidersin.</p></section>
+    <p class="sub noexp" style="margin:8px 0 0">Bir aya dokununca o ayın bilançosu açılır.</p></section>
 
-  <section class="card" id="pv-ledger"><h2>Aylık bilanço<small>devirler dahil</small><button class="pngbtn noexp" onclick="exportPlanPart('bilanco')" aria-label="Aylık bilançoyu PNG kaydet">${DL_ICON}PNG</button></h2>
-    ${ledgerHTML(calc)}
-    <p class="sub noexp" style="margin:0">Devir satırına dokunarak tutarı elle değiştirebilirsin; sonraki aylar yeni tutardan hesaplanır. Bir ayın kart ekstreleri yüklenince o ay gerçekleşen değerlerle hesaplanır ve farkı sonraki aylara devreder.</p></section>
-
-  <section class="card" id="pv-tak"><h2>Taksit takvimi<small>ekstrelerden</small><button class="pngbtn noexp" onclick="exportPlanPart('taksit')" aria-label="Taksit takvimini PNG kaydet">${DL_ICON}PNG</button></h2>
-    ${ganttHTML(calc)}</section>
-
-  <section class="card" id="pv-dist"><h2>Gider nereye gidecek?<small>${range} toplamı</small><button class="pngbtn noexp" onclick="exportPlanPart('gider')" aria-label="Gider dağılımını PNG kaydet">${DL_ICON}PNG</button></h2>
-    ${spendBreakdown(calc)}</section>
-
-  ${itemsCard()}
-
-  <button class="btn block" style="margin:0 0 8px" onclick="openExportMenu()">${DL_ICON}Plan görsellerini kaydet</button>`;
+  <div id="pv-detail">${tabPanel('pl', 'Plan ayrıntıları', [
+    { k: 'bilanco', label: 'Aylık bilanço', html: ledgerHTML(calc) + `<p class="sub noexp" style="margin:0">Devir satırına dokunarak tutarı elle değiştirebilirsin; sonraki aylar yeni tutardan hesaplanır. Bir ayın kart ekstreleri yüklenince o ay gerçekleşen değerlerle hesaplanır ve farkı sonraki aylara devreder.</p>` },
+    { k: 'kalem', label: `Kalemler (${visibleItems().length})`, html: itemsCard() },
+    { k: 'taksit', label: 'Taksit takvimi', html: ganttHTML(calc) },
+    { k: 'gider', label: 'Gider dağılımı', html: `<p class="sub" style="margin:0 0 6px">${range} toplamı</p>` + spendBreakdown(calc) },
+    { k: 'hedef', label: 'Hedefler', html: goalsMini(calc) },
+  ], { action: `<button class="pngbtn noexp" onclick="exportPlanTab()" aria-label="Açık sekmeyi PNG kaydet">${DL_ICON}PNG</button>` })}</div>`;
 }
+window.exportPlanTab = () => {
+  const k = S.ptab.pl || 'bilanco';
+  if (k === 'kalem' || k === 'hedef') return openExportMenu();
+  exportPlanPart(k);
+};
 
 /* ---------- Plan ve gerçekleşen karşılaştırması ---------- */
 function compareBody(r, calc) {
@@ -582,9 +587,21 @@ function planCompareCard(k) {
   if (!k || !visibleItems().length) return '';
   const calc = planCalc(); const r = calcRow(calc, k);
   if (!r || r.act.status === 'plan') return '';
-  return `<section class="card" id="ov-cmp"><h2>Plan ile karşılaştırma<small>${statusBadge(r)}</small>${r.real ? `<button class="pngbtn noexp" onclick="exportCompare('${k}')" aria-label="Karşılaştırmayı PNG kaydet">${DL_ICON}PNG</button>` : ''}</h2>
-    ${compareBody(r, calc)}
-    <button class="btn block noexp" style="margin-top:8px" onclick="go('plan')">Planı aç</button></section>`;
+  if (!r.real) return `<section class="card" id="ov-cmp"><h2>Plan ile karşılaştırma<small>${statusBadge(r)}</small></h2>
+    ${compareBody(r, calc)}</section>`;
+  const pX = r.pTak + r.pGider, aX = r.takT + r.giderT, dX = aX - pX;
+  const cell = (v, bad) => `<td class="${Math.abs(v) < 0.5 ? '' : bad ? 'neg' : 'pos'}">${sgn0(v)}</td>`;
+  return `<section class="card" id="ov-cmp"><h2>Plan ile karşılaştırma<small>${statusBadge(r)}</small></h2>
+    <p class="insight">${Math.abs(dX) < 1 ? 'Planladığın kadar harcadın.' : `Planın <b class="${dX > 0 ? 'neg' : 'pos'}">${nf0.format(Math.abs(dX))} ₺ ${dX > 0 ? 'üzerinde' : 'altında'}</b> harcadın.`}
+      Ay sonucu <b class="${r.bal - r.planBal < 0 ? 'neg' : 'pos'}">${sgn0(r.bal - r.planBal)} ₺</b> fark.</p>
+    <table class="cmptab"><thead><tr><th></th><th>Plan</th><th>Gerçek</th><th>Fark</th></tr></thead><tbody>
+      <tr><th>Gelir</th><td>${nf0.format(r.pGelir)}</td><td>${nf0.format(r.gelirT)}</td>${cell(r.gelirT - r.pGelir, r.gelirT < r.pGelir)}</tr>
+      <tr><th>Gider</th><td>${nf0.format(pX)}</td><td>${nf0.format(aX)}</td>${cell(dX, dX > 0)}</tr>
+      <tr class="bal"><th>Bilanço</th><td>${sgn0(r.planBal)}</td><td>${sgn0(r.bal)}</td>${cell(r.bal - r.planBal, r.bal < r.planBal)}</tr></tbody></table>
+    ${r.act.lines.some(l => l.id === '__card' || l.id === '__man') && (r.later || []).length ? `<div class="warnbox" style="margin:10px 0 0"><p class="sub" style="margin:0 0 8px"><b>${r.later.length} plan kalemi ${MONTHS[+k.slice(5) - 1]} ayından sonra başlıyor</b> (${r.later.slice(0, 3).map(it => esc(it.name)).join(', ')}${r.later.length > 3 ? '…' : ''}); bu yüzden o ayın harcamaları "plan dışı" sayılıyor.</p>
+      <button class="btn ghost block noexp" style="margin-top:0" onclick="pullItems('${k}')">Bu kalemleri ${MONTHS[+k.slice(5) - 1]} ayından başlat</button></div>` : ''}
+    <div class="row" style="gap:8px;margin-top:10px"><button class="btn ghost" style="flex:1" onclick="openCompare('${k}')">Kalem kalem gör</button>
+      <button class="btn ghost" style="flex:1" onclick="go('plan')">Planı aç</button></div></section>`;
 }
 window.openCompare = m => {
   const calc = planCalc(); const r = calcRow(calc, m); if (!r) return;
@@ -641,7 +658,10 @@ window.setPlan = (k, v) => {
 };
 window.planFocus = m => {
   const el = document.getElementById('mb-' + m); if (!el) return;
-  el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  selectTab('pl', 'bilanco');
+  const panel = el.closest('.scrollpanel'), pv = $('#pv-detail');
+  if (pv) pv.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  if (panel) panel.scrollTo({ top: panel.scrollTop + el.getBoundingClientRect().top - panel.getBoundingClientRect().top - 8, behavior: 'smooth' });
   el.classList.remove('flash'); void el.offsetWidth; el.classList.add('flash');
 };
 window.toggleInst = key => {

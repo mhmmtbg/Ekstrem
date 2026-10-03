@@ -58,7 +58,8 @@ function toast(msg, ms = 2600) { const t = document.createElement('div'); t.clas
 const S = { statements: [], incomes: [], rules: [], cards: {}, cardProfile: {},
   profiles: [{ id: 'me', name: 'Ben' }, { id: 'es', name: 'Eşim' }], profile: 'me',
   month: null, view: 'ozet', addMode: 'harcama', theme: 'auto',
-  plan: { items: [], carry: {}, excl: {}, horizon: 6, start: null }, q: '', qScope: 'month', qCat: null, qType: 'spend' };
+  plan: { items: [], carry: {}, excl: {}, horizon: 6, start: null }, q: '', qScope: 'month', qCat: null, qType: 'spend',
+  budgets: {}, subIgnore: [], clsSkip: [], reminders: { on: false, days: 2 }, lock: null, year: null };
 
 async function load() {
   await Store.open();
@@ -83,6 +84,8 @@ async function load() {
   S.profile = g('activeProfile') || 'me';
   S.theme = g('theme') || (() => { try { return localStorage.getItem('ekstrem_theme'); } catch (e) { return null; } })() || 'auto';
   S.plan = Object.assign({ items: [], carry: {}, excl: {}, horizon: 6, start: null }, g('plan') || {});
+  S.budgets = g('budgets') || {}; S.subIgnore = g('subIgnore') || []; S.clsSkip = g('clsSkip') || [];
+  S.reminders = Object.assign({ on: false, days: 2 }, g('reminders') || {}); S.lock = g('lock') || null;
   applyTheme();
   const keys = monthKeys();
   S.month = keys[keys.length - 1] || null;
@@ -273,6 +276,7 @@ async function importFiles(files) {
   }
   await saveKV('cardProfile', S.cardProfile);
   const good = report.filter(r => r.id);
+  if (good.length) { bumpRev(); scheduleReminders(false); }
   if (good.length) {
     const last = good.map(r => r.st).sort((a, b) => a.month.localeCompare(b.month)).pop();
     if (!isHane()) S.profile = last.profile;
@@ -297,6 +301,7 @@ async function importFiles(files) {
   $('#impOk').onclick = () => { closeSheet(true); render(); };
 }
 
+const toTop = () => { const m = $('#main'); if (m) m.scrollTop = 0; };
 /* ---------- Alt panel ---------- */
 let sheetOnClose = null;
 // Geçmiş yönetimi: Android geri hareketi önce paneli kapatır, sonra Özet'e döner, en son çıkmadan önce uyarır.
@@ -304,10 +309,10 @@ let navBusy = false, ignoreNextPop = false, guardTimer = null; const navQueue = 
 const hist = f => navBusy ? navQueue.push(f) : f();
 function initHistory() { history.replaceState({ guard: true }, ''); history.pushState({ v: 'ozet' }, ''); }
 function removeSheetDom() { const s = $('#scrim'); if (s) s.remove(); }
-function openSheet(html, onClose) {
+function openSheet(html, onClose, cls) {
   const had = !!$('#scrim'); removeSheetDom();
-  const sc = document.createElement('div'); sc.className = 'scrim'; sc.id = 'scrim';
-  sc.innerHTML = `<div class="sheet" role="dialog" aria-modal="true">${html}</div>`;
+  const sc = document.createElement('div'); sc.className = 'scrim' + (cls === 'drawer' ? ' side' : ''); sc.id = 'scrim';
+  sc.innerHTML = `<div class="sheet ${cls || ''}" role="dialog" aria-modal="true">${html}</div>`;
   sc.addEventListener('click', e => { if (e.target === sc) closeSheet(); });
   document.body.appendChild(sc); sheetOnClose = onClose || null;
   if (!had) hist(() => history.pushState({ sheet: true, v: S.view }, ''));
@@ -325,14 +330,14 @@ window.addEventListener('popstate', e => {
   if ($('#scrim')) { removeSheetDom(); const cb = sheetOnClose; sheetOnClose = null; if (cb) cb(); return; }
   if (st.sheet) { history.back(); return; }
   if (st.guard) {
-    if (S.view !== 'ozet') { S.view = 'ozet'; render(); window.scrollTo(0, 0); }
+    if (S.view !== 'ozet') { S.view = 'ozet'; render(); toTop(); }
     toast('Çıkmak için tekrar geri kaydır', 2200);
     clearTimeout(guardTimer);
     guardTimer = setTimeout(() => { if ((history.state || {}).guard) history.pushState({ v: 'ozet' }, ''); }, 2300);
     return;
   }
   clearTimeout(guardTimer);
-  S.view = st.v || 'ozet'; render(); window.scrollTo(0, 0);
+  S.view = st.v || 'ozet'; render(); toTop();
 });
 window.closeSheet = closeSheet;
 
@@ -351,20 +356,22 @@ function donut(entries, total, size = 132) {
 }
 
 /* ---------- Üst bant ---------- */
+const MONTH_VIEWS = ['ozet', 'islem', 'trend', 'gelir', 'butce'];
 function renderHeader() {
   const tabs = [...S.profiles, { id: 'hane', name: 'Hane' }];
   $('#people').innerHTML = tabs.map(p => `<button role="tab" data-p="${p.id}" aria-selected="${p.id === S.profile}">${esc(p.name)}</button>`).join('');
   const keys = monthKeys();
   $('#months').innerHTML = keys.map(k => `<button class="mchip" data-m="${k}" aria-pressed="${k === S.month}">${mShort(k)}</button>`).join('')
     || `<span style="color:rgba(255,255,255,.6);font-size:13px">${esc(isHane() ? 'Henüz ekstre yok' : profName(S.profile) + ' için henüz ekstre yok')}</span>`;
-  $('#months').hidden = S.view === 'plan';
-  const act = $('#months [aria-pressed=true]'); if (act && S.view !== 'plan') act.scrollIntoView({ inline: 'center', block: 'nearest' });
+  const monthly = MONTH_VIEWS.includes(S.view);
+  $('#months').hidden = !monthly;
+  const act = $('#months [aria-pressed=true]'); if (act && monthly) act.scrollIntoView({ inline: 'center', block: 'nearest' });
 }
 
 function viewEmpty() {
   const who = isHane() ? '' : ` (${esc(profName(S.profile))})`;
   return `<div class="empty"><h2>Ekstre yükle${who}</h2>
-    <p>Kredi kartı ekstre PDF'lerini seç. Ziraat Bankkart, Akbank Axess ve Yapı Kredi World doğrudan tanınır; tablo düzenindeki diğer banka ekstreleri de okunmaya çalışılır. Veriler yalnızca bu telefonda saklanır.</p>
+    <p>Kredi kartı ekstre PDF'lerini seç. Ziraat, Akbank, Yapı Kredi, Halkbank, DenizBank, Enpara, İş Bankası, Garanti ve tablo düzenindeki diğer banka ekstreleri okunur. Veriler yalnızca bu telefonda saklanır.</p>
     <button class="btn" onclick="document.getElementById('file').click()">PDF ekstre seç</button>
     ${isHane() ? '' : `<button class="btn ghost" style="margin-left:6px" onclick="S.addMode='harcama';go('gelir')">Kart dışı harcama gir</button>`}
     <p class="sub" style="margin-top:18px">Birden fazla ekstreyi aynı anda seçebilirsin; aynı ayın farklı banka ekstreleri birleştirilir.</p></div>`;
@@ -442,10 +449,48 @@ function viewOzet() {
     (change != null ? ` Toplam harcama ${mLabel(prevKey(k)).split(' ')[0]} ayına göre <b class="${change > 0 ? 'neg' : 'pos'}">%${nf0.format(Math.abs(change))} ${change > 0 ? 'arttı' : 'azaldı'}</b>.` : '') : '';
 
   const dups = duplicateGroups().filter(g => g.some(s => s.month === k && inProfile(s)));
+  const allM = Object.entries(merch).sort((a, b) => b[1].v - a[1].v).slice(0, 25);
+  const tabs = [
+    { k: 'kat', label: 'Kategoriler', html: `${insight ? `<p class="insight">${insight}</p>` : ''}
+      <ul class="cats">${cats.map(([c, v]) => {
+        const d = psts.length ? v - (pcats[c] || 0) : null;
+        return `<li onclick="filterCat('${esc(c)}')">${ico(c)}<span class="nm">${esc(c)}</span>
+          <span class="amt">${tl(v)}</span>
+          <span class="meta"><span class="bar"><i style="width:${Math.max(0, v / (cats[0][1] || 1) * 100)}%;background:${CATCOL[c]}"></i></span>
+          <span class="sub">%${spend ? nf0.format(v / spend * 100) : 0}</span>
+          ${d != null && Math.abs(d) >= 1 ? `<span class="delta ${d > 0 ? 'neg' : 'pos'}">${d > 0 ? '+' : '−'}${nf0.format(Math.abs(d))}</span>` : ''}</span></li>`;
+      }).join('')}</ul>${psts.length ? `<p class="panelnote">Renkli tutarlar ${mShort(prevKey(k))} ile farkı gösterir</p>` : ''}` },
+    { k: 'yer', label: 'Yerler', html: `<ul class="list-plain">${allM.map(([m, o]) =>
+      `<li><span style="display:flex;align-items:center;gap:10px;min-width:0">${ico(o.c, ';width:34px;height:34px;font-size:16px;border-radius:10px')}<span style="min-width:0"><b style="display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(m)}</b><span class="sub">${o.n} işlem</span></span></span><b>${tl(o.v)}</b></li>`).join('')}</ul>` },
+    { k: 'takvim', label: 'Takvim', html: `<div class="cal">${DAYS.map(d => `<span class="dh">${d}</span>`).join('')}
+        ${cells.map(c => c ? `<span class="d ${c[0] === topDay[0] ? 'top' : ''} ${c[1] / maxDay > .45 ? 'hot' : ''}" style="background:${heat(c[1])}" title="${dLabel(c[0])}: ${tl(c[1])}">${c[2]}</span>` : '<span class="d x"></span>').join('')}</div>
+      <div class="calleg"><span>az</span>${[0.02, .15, .4, .7, 1].map(v => `<i style="background:${heat(v * maxDay)}"></i>`).join('')}<span>çok</span>
+        <span style="margin-left:auto">hafta sonu payı %${spend ? nf0.format(weekend / spend * 100) : 0}</span></div>
+      ${topDay[0] ? `<p class="sub" style="margin:10px 0 0">En yoğun gün ${dLabel(topDay[0])}: ${tl(topDay[1])}. Taksit dilimleri, taksidin bu döneme yansıdığı günde sayılır.</p>` : ''}` },
+    isHane() && { k: 'kisi', label: 'Kişiler', html: `<div class="stackbar">${S.profiles.map((p, i) => `<i style="width:${(byPerson[p.id] || 0) / (spend || 1) * 100}%;background:${PCOL[i % 4]}"></i>`).join('')}</div>
+      <ul class="list-plain" style="margin-top:6px">${S.profiles.map((p, i) => {
+        const pi = S.incomes.filter(x => x.month === k && x.profile === p.id).reduce((a, x) => a + x.amount, 0);
+        return `<li><span><i class="dot" style="background:${PCOL[i % 4]};margin-right:8px"></i>${esc(p.name)}${pi ? `<br><span class="sub">gelir ${tl0(pi)}</span>` : ''}</span><b>${tl(byPerson[p.id] || 0)}</b></li>`;
+      }).join('')}</ul><button class="btn ghost block" onclick="go('kisi')">Kişilere göre trendler</button>` },
+    cardList.length > 1 && { k: 'kart', label: 'Kartlar', html: `<div class="stackbar">${cardList.map((c, i) => `<i style="width:${Math.max(0, c.v / spend * 100)}%;background:${cardCols[i % 6]}"></i>`).join('')}</div>
+      <ul class="list-plain" style="margin-top:6px">${cardList.map((c, i) => `<li><span><i class="dot" style="background:${cardCols[i % 6]};margin-right:8px"></i>${esc(cardName(c.c, c.st))}${isHane() ? `<span class="pill">${esc(profName(c.st.profile))}</span>` : ''}</span><b>${tl(c.v)}</b></li>`).join('')}</ul>` },
+    takAll && { k: 'taksit', label: 'Taksitler', html: `<div class="stats"><div class="stat"><div class="l">Bu ay ödenen</div><div class="v">${tl0(takAll)}</div></div>
+      <div class="stat"><div class="l">Gelecek ay</div><div class="v">${tl0(takNext)}</div></div>
+      <div class="stat"><div class="l">Kalan borç</div><div class="v">${tl0(takRemain)}</div></div></div>
+      ${tak.length ? `<ul class="list-plain" style="margin-top:10px">${tak.sort((a, b) => (b.t.taksitToplam - b.t.taksitNo) * b.t.tl - (a.t.taksitToplam - a.t.taksitNo) * a.t.tl).map(({ t, st }) =>
+        `<li><span style="min-width:0"><b>${esc(merchantKey(t.desc))}</b><br><span class="sub">${esc(srcLabel(t, st))}, ${t.taksitToplam - t.taksitNo} ay kaldı</span>
+          <span class="dotsline" aria-label="${t.taksitNo}/${t.taksitToplam} taksit">${Array.from({ length: Math.min(t.taksitToplam, 12) }, (_, j) => `<i class="${j < t.taksitNo ? '' : 'o'}"></i>`).join('')}</span></span><b>${tl(t.tl)}</b></li>`).join('')}</ul>` : ''}` },
+    { k: 'ekstre', label: 'Ekstreler', html: `<ul class="list-plain">${sts.map(st => st.manual
+      ? `<li><span><b>Kart dışı harcamalar</b>${isHane() ? `<span class="pill">${esc(profName(st.profile))}</span>` : ''}<br><span class="sub">${st.tx.length} kayıt: nakit, havale vb.</span></span><span class="strow"><b>${tl(st.tx.reduce((a, t) => a + t.tl, 0))}</b>${TRASH(st.id)}</span></li>`
+      : `<li><span><b>${esc(st.bank)}</b>${isHane() ? `<span class="pill">${esc(profName(st.profile))}</span>` : ''}
+        <br><span class="sub">Kesim ${dTR(st.kesim)}, son ödeme ${dTR(st.sonOdeme)}</span></span>
+        <span class="strow"><b style="text-align:right">${esc(st.borcTL || '-')} ₺${st.borcUSD && st.borcUSD !== '0,00' ? '<br>+ ' + esc(st.borcUSD) + ' $' : ''}</b>${TRASH(st.id)}</span></li>`).join('')}</ul>` },
+  ];
   return `
   ${dups.length ? `<div class="dupwarn"><b>Aynı ekstre birden fazla yüklenmiş</b>
     <span>${dups.map(g => `${esc(g[0].bank)}, kesim ${dTR(g[0].kesim)} (${g.length} kez)`).join('; ')}. Bu yüzden toplamlar fazla görünüyor.</span>
     <button class="btn" onclick="fixDuplicates()">Kopyaları sil, birini tut</button></div>` : ''}
+  ${ozetAlerts(k, sts)}
   <div class="receipt-wrap"><div class="receipt" role="group" aria-label="${mLabel(k)} harcama özeti">
     <div class="rc-head"><div class="shop">Ekstrem</div>
       <div class="meta">${up(mLabel(k))} · ${up(isHane() ? 'Hane' : profName(S.profile))}</div></div>
@@ -470,58 +515,15 @@ function viewOzet() {
     ${inc || isHane() ? '' : `<button class="btn ghost" onclick="S.addMode='gelir';go('gelir')">Gelir gir</button>`}
     <button class="btn ghost" onclick="exportReceipt()">${DL_ICON} Fişi PNG kaydet</button></div>
 
-  ${isHane() ? `<section class="card"><h2>Kişilere göre</h2>
-    <div class="stackbar">${S.profiles.map((p, i) => `<i style="width:${(byPerson[p.id] || 0) / (spend || 1) * 100}%;background:${PCOL[i % 4]}"></i>`).join('')}</div>
-    <ul class="list-plain" style="margin-top:6px">${S.profiles.map((p, i) => {
-      const pi = S.incomes.filter(x => x.month === k && x.profile === p.id).reduce((a, x) => a + x.amount, 0);
-      return `<li><span><i class="dot" style="background:${PCOL[i % 4]};margin-right:8px"></i>${esc(p.name)}${pi ? `<br><span class="sub">gelir ${tl0(pi)}</span>` : ''}</span><b>${tl(byPerson[p.id] || 0)}</b></li>`;
-    }).join('')}</ul></section>` : ''}
-
   ${usdSts.map(st => `<section class="card"><h2>Döviz harcaması<small>${esc(st.bank)}</small></h2>
     <div class="row"><div><b>${nf.format(st.tx.filter(isSpend).reduce((x, t) => x + (t.type === 'refund' ? -t.usd : t.usd || 0), 0))} USD</b>
       <div class="sub">${st.usdRate ? `1 USD = ${nf.format(st.usdRate)} ₺ ile toplama dahil` : 'Toplama eklemek için ödediğin kuru gir'}</div></div>
     <input class="inp" style="width:110px" inputmode="decimal" placeholder="Kur" value="${st.usdRate ? nf.format(st.usdRate) : ''}" onchange="setRate('${st.id}', this.value)"></div></section>`).join('')}
 
-  ${planCompareCard(k)}
 
-  <section class="card"><h2>Nereye gitti?${psts.length ? `<small>${mShort(prevKey(k))} ile fark</small>` : ''}</h2>
-    ${insight ? `<p class="insight">${insight}</p>` : ''}
-    <ul class="cats">${cats.map(([c, v]) => {
-      const d = psts.length ? v - (pcats[c] || 0) : null;
-      return `<li onclick="filterCat('${esc(c)}')">${ico(c)}<span class="nm">${esc(c)}</span>
-        <span class="amt">${tl(v)}</span>
-        <span class="meta"><span class="bar"><i style="width:${Math.max(0, v / (cats[0][1] || 1) * 100)}%;background:${CATCOL[c]}"></i></span>
-        <span class="sub">%${spend ? nf0.format(v / spend * 100) : 0}</span>
-        ${d != null && Math.abs(d) >= 1 ? `<span class="delta ${d > 0 ? 'neg' : 'pos'}">${d > 0 ? '+' : '−'}${nf0.format(Math.abs(d))}</span>` : ''}</span></li>`;
-    }).join('')}</ul></section>
+  ${tabPanel('oz', 'Harcama detayları', tabs)}
 
-  <section class="card"><h2>Harcama takvimi<small>${topDay[0] ? `en yoğun ${dLabel(topDay[0])}` : ''}</small></h2>
-    <div class="cal">${DAYS.map(d => `<span class="dh">${d}</span>`).join('')}
-      ${cells.map(c => c ? `<span class="d ${c[0] === topDay[0] ? 'top' : ''} ${c[1] / maxDay > .45 ? 'hot' : ''}" style="background:${heat(c[1])}" title="${dLabel(c[0])}: ${tl(c[1])}">${c[2]}</span>` : '<span class="d x"></span>').join('')}</div>
-    <div class="calleg"><span>az</span>${[0.02, .15, .4, .7, 1].map(v => `<i style="background:${heat(v * maxDay)}"></i>`).join('')}<span>çok</span>
-      <span style="margin-left:auto">hafta sonu payı %${spend ? nf0.format(weekend / spend * 100) : 0}</span></div>
-    ${topDay[0] ? `<p class="sub" style="margin:10px 0 0">En yoğun gün ${dLabel(topDay[0])}: ${tl(topDay[1])}. Taksit dilimleri, taksidin bu döneme yansıdığı günde sayılır.</p>` : ''}</section>
-
-  <section class="card"><h2>En çok harcanan yerler</h2><ul class="list-plain">${topM.map(([m, o], i) =>
-    `<li><span style="display:flex;align-items:center;gap:10px;min-width:0">${ico(o.c, ';width:34px;height:34px;font-size:16px;border-radius:10px')}<span style="min-width:0"><b style="display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(m)}</b><span class="sub">${o.n} işlem</span></span></span><b>${tl(o.v)}</b></li>`).join('')}</ul></section>
-
-  ${cardList.length > 1 ? `<section class="card"><h2>Kartlara göre</h2>
-    <div class="stackbar">${cardList.map((c, i) => `<i style="width:${Math.max(0, c.v / spend * 100)}%;background:${cardCols[i % 6]}"></i>`).join('')}</div>
-    <ul class="list-plain" style="margin-top:6px">${cardList.map((c, i) => `<li><span><i class="dot" style="background:${cardCols[i % 6]};margin-right:8px"></i>${esc(cardName(c.c, c.st))}${isHane() ? `<span class="pill">${esc(profName(c.st.profile))}</span>` : ''}</span><b>${tl(c.v)}</b></li>`).join('')}</ul></section>` : ''}
-
-  ${takAll ? `<section class="card"><h2>Taksitler</h2>
-    <div class="stats"><div class="stat"><div class="l">Bu ay ödenen</div><div class="v">${tl0(takAll)}</div></div>
-    <div class="stat"><div class="l">Gelecek ay</div><div class="v">${tl0(takNext)}</div></div>
-    <div class="stat"><div class="l">Kalan borç</div><div class="v">${tl0(takRemain)}</div></div></div>
-    ${tak.length ? `<ul class="list-plain" style="margin-top:10px">${tak.sort((a, b) => (b.t.taksitToplam - b.t.taksitNo) * b.t.tl - (a.t.taksitToplam - a.t.taksitNo) * a.t.tl).map(({ t, st }) =>
-      `<li><span style="min-width:0"><b>${esc(merchantKey(t.desc))}</b><br><span class="sub">${esc(srcLabel(t, st))}, ${t.taksitToplam - t.taksitNo} ay kaldı</span>
-        <span class="dotsline" aria-label="${t.taksitNo}/${t.taksitToplam} taksit">${Array.from({ length: Math.min(t.taksitToplam, 12) }, (_, j) => `<i class="${j < t.taksitNo ? '' : 'o'}"></i>`).join('')}</span></span><b>${tl(t.tl)}</b></li>`).join('')}</ul>` : ''}</section>` : ''}
-
-  <section class="card"><h2>Ekstreler</h2><ul class="list-plain">${sts.map(st => st.manual
-    ? `<li><span><b>Kart dışı harcamalar</b>${isHane() ? `<span class="pill">${esc(profName(st.profile))}</span>` : ''}<br><span class="sub">${st.tx.length} kayıt: nakit, havale vb.</span></span><span class="strow"><b>${tl(st.tx.reduce((a, t) => a + t.tl, 0))}</b>${TRASH(st.id)}</span></li>`
-    : `<li><span><b>${esc(st.bank)}</b>${isHane() ? `<span class="pill">${esc(profName(st.profile))}</span>` : ''}
-      <br><span class="sub">Kesim ${dTR(st.kesim)}, son ödeme ${dTR(st.sonOdeme)}</span></span>
-      <span class="strow"><b style="text-align:right">${esc(st.borcTL || '-')} ₺${st.borcUSD && st.borcUSD !== '0,00' ? '<br>+ ' + esc(st.borcUSD) + ' $' : ''}</b>${TRASH(st.id)}</span></li>`).join('')}</ul></section>`;
+  ${planCompareCard(k)}`;
 }
 
 function TRASH(id) {
@@ -599,9 +601,9 @@ function viewTrend() {
       ${d.i ? `<div class="inc" style="bottom:calc(${d.i / max * 78}% + 20px)"></div>` : ''}
       <div class="lbl">${mShort(d.k)}</div></div>`).join('')}</div>
     <div class="legend"><span><i style="background:var(--bar-muted)"></i>Harcama</span><span><i style="background:var(--firuze);height:3px"></i>Gelir</span></div></section>
-  <section class="card"><h2>Ay ay özet</h2><table class="t"><thead><tr><th>Ay</th><th>Harcama</th><th>Gelir</th><th>Kalan</th></tr></thead><tbody>
+  <section class="card"><h2>Ay ay özet</h2>${scrollList(`<table class="t"><thead><tr><th>Ay</th><th>Harcama</th><th>Gelir</th><th>Kalan</th></tr></thead><tbody>
     ${data.slice().reverse().map(d => `<tr onclick="pickMonth('${d.k}')"><td>${mLabel(d.k)}<br><span class="sub">${[...new Set(d.sts.map(s => s.manual ? 'Kart dışı' : bankShort(s.bank)))].map(esc).join(', ')}</span></td><td>${d.has ? tl0(d.s) : '—'}</td><td>${d.i ? tl0(d.i) : '—'}</td>
-      <td class="${d.i ? (d.i - d.s >= 0 ? 'pos' : 'neg') : ''}">${d.i && d.has ? tl0(d.i - d.s) : '—'}</td></tr>`).join('')}</tbody></table></section>
+      <td class="${d.i ? (d.i - d.s >= 0 ? 'pos' : 'neg') : ''}">${d.i && d.has ? tl0(d.i - d.s) : '—'}</td></tr>`).join('')}</tbody></table>`, 'short')}</section>
   ${tc ? `<section class="card"><h2>Kategori bazında<small>ortalama ${tl0(cavg)}/ay</small></h2>
     <div class="chips">${allCats.sort((a, b) => a.localeCompare(b, 'tr')).map(c => `<button class="chip" aria-pressed="${c === tc}" onclick="S.trendCat='${esc(c)}';render()"><i class="dot" style="background:${CATCOL[c]}"></i>${esc(c)}</button>`).join('')}</div>
     <div class="tbars" style="height:140px">${cdata.map(d => `<div class="tcol"><div class="val">${nf0.format(d.v / 1000 * 10) / 10}k</div>
@@ -646,8 +648,8 @@ function viewManualForm(k) {
     <label class="f" for="mNote">Not (isteğe bağlı)</label><input class="inp" id="mNote">
     <button class="btn block" onclick="addManual()">Harcamayı kaydet</button></section>
   <section class="card"><h2>${mLabel(k)} kart dışı harcamaları${items.length ? `<small>${tl(items.reduce((a, t) => a + t.tl, 0))}</small>` : ''}</h2>
-    ${items.length ? `<ul class="list-plain">${items.map(t => `<li><span><b>${esc(t.desc)}</b><br><span class="sub">${dLabel(t.date)} · ${esc(catOf(t))} · ${esc(t.pay || 'Nakit')}${t.note ? ' · ' + esc(t.note) : ''}</span></span>
-      <span style="white-space:nowrap"><b>${tl(t.tl)}</b><button class="x" aria-label="Sil" onclick="delManual('${st.id}',${t.i})">×</button></span></li>`).join('')}</ul>`
+    ${items.length ? scrollList(`<ul class="list-plain">${items.map(t => `<li><span><b>${esc(t.desc)}</b><br><span class="sub">${dLabel(t.date)} · ${esc(catOf(t))} · ${esc(t.pay || 'Nakit')}${t.note ? ' · ' + esc(t.note) : ''}</span></span>
+      <span style="white-space:nowrap"><b>${tl(t.tl)}</b><button class="x" aria-label="Sil" onclick="delManual('${st.id}',${t.i})">×</button></span></li>`).join('')}</ul>`, 'short')
       : '<p class="sub">Bu ay için kart dışı harcama girilmedi.</p>'}</section>`;
 }
 function viewIncomeForm(k) {
@@ -692,23 +694,51 @@ window.delManual = async (sid, i) => {
   render();
 };
 
+const VIEWS = () => ({ ozet: viewOzet, islem: viewIslem, trend: viewTrend, plan: viewPlan, gelir: viewGelir, ...EXTRA_VIEWS });
+// Sekmeli panel: tüm sekmeler bir kez çizilir, geçiş yalnızca görünürlüğü değiştirir (sayfa kaymaz)
+S.ptab = {};
+function tabPanel(id, title, tabs, opts = {}) {
+  tabs = tabs.filter(Boolean);
+  if (!tabs.length) return '';
+  const cur = tabs.some(t => t.k === S.ptab[id]) ? S.ptab[id] : tabs[0].k;
+  return `<section class="card tpanel" id="${id}"><h2>${title}${opts.action || ''}</h2>
+    <div class="ptabs" role="tablist" aria-label="${esc(title)}">${tabs.map(t => `<button role="tab" data-ptab="${id}" data-k="${t.k}" aria-selected="${t.k === cur}">${esc(t.label)}</button>`).join('')}</div>
+    ${tabs.map(t => `<div class="tp-body scrollpanel ${opts.short ? 'short' : ''}" role="tabpanel" data-pbody="${id}:${t.k}" ${t.k === cur ? '' : 'hidden'}>${t.html}</div>`).join('')}
+  </section>`;
+}
+function selectTab(id, k) {
+  S.ptab[id] = k;
+  document.querySelectorAll(`[data-ptab="${id}"]`).forEach(b => b.setAttribute('aria-selected', b.dataset.k === k));
+  document.querySelectorAll(`[data-pbody^="${id}:"]`).forEach(d => { d.hidden = d.dataset.pbody !== `${id}:${k}`; if (!d.hidden) d.scrollTop = 0; });
+}
+document.addEventListener('click', e => { const b = e.target.closest('[data-ptab]'); if (b) selectTab(b.dataset.ptab, b.dataset.k); });
+// Kaydırılan liste paneli
+const scrollList = (html, cls = '') => `<div class="scrollpanel ${cls}">${html}</div>`;
+
 function render() {
   renderHeader();
   document.querySelectorAll('#tabs button').forEach(b => b.setAttribute('aria-current', b.dataset.v === S.view ? 'page' : 'false'));
-  const v = { ozet: viewOzet, islem: viewIslem, trend: viewTrend, plan: viewPlan, gelir: viewGelir }[S.view];
-  $('#main').innerHTML = v();
+  const v = VIEWS()[S.view] || viewOzet;
+  const main = $('#main');
+  // Aynı sayfa yeniden çizilirken kaydırma konumlarını koru
+  const same = main.dataset.view === S.view, keep = {}, top = main.scrollTop;
+  if (same) main.querySelectorAll('.scrollpanel').forEach((el, i) => { keep[el.dataset.pbody || 'sp' + i] = el.scrollTop; });
+  main.dataset.view = S.view;
+  main.innerHTML = v();
+  if (same) { main.scrollTop = top; main.querySelectorAll('.scrollpanel').forEach((el, i) => { const k = el.dataset.pbody || 'sp' + i; if (keep[k]) el.scrollTop = keep[k]; }); }
+  main.classList.toggle('fill', S.view === 'islem' && !!main.querySelector('.txlist'));
   const q = $('#q');
   if (q) q.oninput = e => { S.q = e.target.value; const pos = e.target.selectionStart; render(); const n = $('#q'); n.focus(); n.setSelectionRange(pos, pos); };
 }
 
 /* ---------- Eylemler ---------- */
 window.go = v => {
-  if (v === S.view) { window.scrollTo(0, 0); return; }
+  if (v === S.view) { toTop(); return; }
   if (v === 'ozet') { hist(() => { const cur = history.state || {}; if (cur.v && cur.v !== 'ozet') history.back(); else { S.view = 'ozet'; render(); } }); return; }
   hist(() => { const cur = history.state || {}; (cur.v && cur.v !== 'ozet' ? history.replaceState : history.pushState).call(history, { v }, ''); });
-  S.view = v; render(); window.scrollTo(0, 0);
+  S.view = v; render(); toTop();
 };
-window.pickMonth = k => { S.month = k; if (S.view === 'ozet') { render(); window.scrollTo(0, 0); } else go('ozet'); };
+window.pickMonth = k => { S.month = k; if (S.view === 'ozet') { render(); toTop(); } else go('ozet'); };
 window.setQ = (key, val) => { S[key] = val; render(); };
 window.filterCat = c => { S.qCat = c; S.qScope = 'month'; S.qType = 'spend'; S.q = ''; go('islem'); };
 function setProfile(p) {
@@ -784,22 +814,34 @@ window.editTx = (sid, i) => {
 function openSettings() {
   const cardSet = {}; S.statements.forEach(s => s.tx.forEach(t => { if (t.card) cardSet[t.card] = s; }));
   const opts = sel => S.profiles.map(p => `<option value="${p.id}" ${p.id === sel ? 'selected' : ''}>${esc(p.name)}</option>`).join('');
+  const stTab = ['genel', 'kart', 'kural', 'ekstre', 'yedek'].includes(S.ptab.st) ? S.ptab.st : 'genel';
   openSheet(`<h3>Ayarlar</h3>
+    <div class="ptabs sheettabs" role="tablist" aria-label="Ayar bölümleri">${[['genel', 'Genel'], ['kart', 'Kartlar'], ['kural', 'Kurallar'], ['ekstre', 'Ekstreler'], ['yedek', 'Yedek']].map(([k, l]) => `<button role="tab" data-ptab="st" data-k="${k}" aria-selected="${k === stTab}">${l}</button>`).join('')}</div>
+    <div class="tp-body" data-pbody="st:genel" ${stTab === 'genel' ? '' : 'hidden'}>
     <label class="f">Görünüm</label>
     <div class="seg" role="group" aria-label="Tema">${[['auto', 'Telefona göre'], ['light', 'Açık'], ['dark', 'Koyu']].map(([k, l]) =>
       `<button style="flex:1" aria-pressed="${S.theme === k}" data-theme-set="${k}">${l}</button>`).join('')}</div>
     <label class="f">Kişiler</label>
     ${S.profiles.map(p => `<input class="inp" style="margin-bottom:6px" data-pname="${p.id}" value="${esc(p.name)}">`).join('')}
+    ${settingsExtra()}
+    </div>
+    <div class="tp-body" data-pbody="st:kart" ${stTab === 'kart' ? '' : 'hidden'}>
     <label class="f">Kartlar</label>
     ${Object.keys(cardSet).length ? Object.entries(cardSet).map(([c, s]) => `<div class="row" style="margin-bottom:6px;gap:6px">
       <span style="flex:0 0 92px;font-size:13px">${esc(bankShort(s.bank))}<br>•••• ${c}</span>
       <input class="inp" data-card="${c}" value="${esc(S.cards[c] || '')}" placeholder="Kart adı">
       <select class="inp" style="width:auto" data-cprof="${c}">${opts(S.cardProfile[c] || s.profile)}</select></div>`).join('') : '<p class="sub">Ekstre yükleyince kartların burada görünür.</p>'}
+    </div>
+    <div class="tp-body" data-pbody="st:kural" ${stTab === 'kural' ? '' : 'hidden'}>
     <label class="f">Kendi kategori kuralların (${S.rules.length})</label>
     ${S.rules.length ? `<ul class="list-plain">${S.rules.map((r, i) => `<li><span>"${esc(r.kw)}" → <b>${esc(r.cat)}</b></span><button class="x" aria-label="Kuralı sil" data-rule="${i}">×</button></li>`).join('')}</ul>` : '<p class="sub">Bir işleme dokunup kategorisini değiştirdiğinde kural buraya eklenir.</p>'}
+    </div>
+    <div class="tp-body" data-pbody="st:ekstre" ${stTab === 'ekstre' ? '' : 'hidden'}>
     <label class="f">Yüklü ekstreler</label>
     ${duplicateGroups().length ? `<div class="dupwarn"><b>${duplicateGroups().reduce((a, g) => a + g.length - 1, 0)} kopya ekstre var</b><button class="btn" id="fixDup">Kopyaları sil</button></div>` : ''}
     <ul class="list-plain">${S.statements.slice().reverse().map(s => `<li><span>${esc(s.manual ? 'Kart dışı harcamalar' : s.bank)} · ${mLabel(s.month)}<br><span class="sub">${esc(profName(s.profile))} · ${s.tx.length} ${s.manual ? 'kayıt' : 'satır · kesim ' + dTR(s.kesim)}</span></span><button class="trash" aria-label="Sil" data-st="${s.id}"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg></button></li>`).join('') || '<li class="sub">Yok</li>'}</ul>
+    </div>
+    <div class="tp-body" data-pbody="st:yedek" ${stTab === 'yedek' ? '' : 'hidden'}>
     <label class="f">Yedekleme</label>
     <p class="sub" style="margin:0 0 6px">Veriler yalnızca bu telefonda (${Store.mode}) saklanır. Uygulamayı silmeden önce yedek al.</p>
     <button class="btn ghost block" id="bkDl">Yedeği dosya olarak kaydet ve paylaş</button>
@@ -807,6 +849,7 @@ function openSettings() {
     ${isNative() ? '<p class="sub" style="margin:6px 0 0">Uygulama arka plana alındığında yedek kendiliğinden Belgeler › Ekstrem › ekstrem-otomatik-yedek.json dosyasına yazılır.</p>' : ''}
     <button class="btn ghost block" id="bkIn">Yedekten geri yükle</button>
     <button class="btn danger block" id="wipe">Tüm verileri sil</button>
+    </div>
     <button class="btn block" id="setSave">Kaydet ve kapat</button>`);
   document.querySelectorAll('[data-theme-set]').forEach(b => b.onclick = () => {
     setTheme(b.dataset.themeSet); document.querySelectorAll('[data-theme-set]').forEach(x => x.setAttribute('aria-pressed', x === b)); });
@@ -853,7 +896,8 @@ function openSettings() {
 /* ---------- Yedek ---------- */
 const isNative = () => !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform() && window.Capacitor.nativePromise);
 const backupJSON = () => JSON.stringify({ app: 'ekstrem', v: 2, at: new Date().toISOString(), statements: S.statements, incomes: S.incomes,
-  rules: S.rules, cards: S.cards, cardProfile: S.cardProfile, profiles: S.profiles, plan: S.plan, theme: S.theme });
+  rules: S.rules, cards: S.cards, cardProfile: S.cardProfile, profiles: S.profiles, plan: S.plan, theme: S.theme,
+  budgets: S.budgets, subIgnore: S.subIgnore, clsSkip: S.clsSkip, reminders: S.reminders });
 async function saveTextFile(text, name, mime) {
   const cap = window.Capacitor;
   if (isNative()) {
@@ -886,6 +930,7 @@ document.addEventListener('visibilitychange', async () => {
   catch (e) { /* otomatik yedek isteğe bağlı */ } finally { autoBackupBusy = false; }
 });
 
+const BK_KEYS = ['rules', 'cards', 'cardProfile', 'profiles', 'plan', 'theme', 'budgets', 'subIgnore', 'clsSkip', 'reminders'];
 // Yedek metnini çöz: önce olduğu gibi, sonra temizleyerek, en son kayıt kayıt kurtararak
 function parseBackup(raw) {
   let t = String(raw || '').replace(/^﻿/, '').replace(/[​-‍⁠­]/g, '').replace(/[“”„″]/g, '"').trim();
@@ -940,7 +985,7 @@ function salvageBackup(s) {
     const body = arr ? arr.slice(1, -1) : s.slice(iStart + 1, (s.slice(iStart).search(/\]\s*,\s*"(rules|cards|plan)"/) + iStart) || s.length);
     splitItems(body.trim()).forEach(p => { if (!p.trim()) return; const v = tryJSON(p); if (v && v.month && typeof v.amount === 'number') out.incomes.push(v); else out.lostIncomes++; });
   }
-  for (const k of ['rules', 'cards', 'cardProfile', 'profiles', 'plan', 'theme']) {
+  for (const k of BK_KEYS) {
     const p = keyAt(k); if (p < 0) continue;
     const v = cutValue(s, p); const d = v != null ? tryJSON(v) : undefined;
     if (d !== undefined) out[k] = d;
@@ -971,11 +1016,13 @@ async function restore(text) {
     if (!ok) return;
   }
   try {
+    const keepLock = S.lock;
     await Promise.all(['statements', 'incomes', 'kv'].map(s => Store.clear(s)));
+    if (keepLock) await saveKV('lock', keepLock);
     for (const s of d.statements || []) await Store.put('statements', s);
     for (const i of d.incomes || []) await Store.put('incomes', i);
-    for (const k of ['rules', 'cards', 'cardProfile', 'profiles', 'plan', 'theme']) if (d[k]) await saveKV(k, d[k]);
-    await load(); closeSheet(true); render();
+    for (const k of BK_KEYS) if (d[k]) await saveKV(k, d[k]);
+    await load(); closeSheet(true); render(); bumpRev(); scheduleReminders(false);
     toast(`Yedek geri yüklendi: ${(d.statements || []).length} ekstre, ${nTx} işlem`, 4000);
   } catch (e) { toast('Geri yükleme başarısız: ' + e.message, 5000); }
 }
@@ -983,6 +1030,7 @@ async function restore(text) {
 /* ---------- Başlat ---------- */
 $('#btnImport').onclick = () => $('#file').click();
 $('#btnSettings').onclick = openSettings;
+$('#btnMenu').onclick = openMenu;
 $('#btnTheme').onclick = () => setTheme(resolvedTheme() === 'dark' ? 'light' : 'dark');
 $('#file').onchange = e => { const f = [...e.target.files]; e.target.value = ''; importFiles(f); };
 $('#fileJson').onchange = async e => { const f = e.target.files[0]; e.target.value = ''; if (f) restore(await f.text()); };
@@ -990,4 +1038,4 @@ $('#months').onclick = e => { const b = e.target.closest('[data-m]'); if (b) { S
 $('#people').onclick = e => { const b = e.target.closest('[data-p]'); if (b) setProfile(b.dataset.p); };
 $('#tabs').onclick = e => { const b = e.target.closest('[data-v]'); if (b) go(b.dataset.v); };
 initHistory();
-load().then(render).catch(e => { $('#main').innerHTML = `<div class="empty"><p>Başlatılamadı: ${esc(e.message)}</p></div>`; });
+load().then(async () => { const shared = await peekShared(); await lockGate(!!shared); render(); scheduleReminders(false); if (shared) checkSharedFiles(shared); }).catch(e => { $('#main').innerHTML = `<div class="empty"><p>Başlatılamadı: ${esc(e.message)}</p></div>`; });

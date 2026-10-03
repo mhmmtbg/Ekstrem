@@ -35,29 +35,34 @@
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html,body{margin:0;overflow-x:clip}
 body{background:var(--bg);color:var(--ink);font-family:var(--ui);font-size:15px;line-height:1.45;font-variant-numeric:tabular-nums;
-  display:flex;flex-direction:column;min-height:100vh;min-height:100dvh;font-optical-sizing:auto}
+  display:flex;flex-direction:column;height:100vh;height:100dvh;overflow:hidden;font-optical-sizing:auto}
 button,input,select,textarea{font:inherit;color:inherit}
 button{cursor:pointer}
 :focus-visible{outline:3px solid var(--kobalt2);outline-offset:2px}
 
 /* Üst bant */
-header.top{background:var(--head);color:#fff;padding:calc(14px + env(safe-area-inset-top,0px)) 16px 0}
+header.top{background:var(--head);color:#fff;padding:calc(12px + env(safe-area-inset-top,0px)) 16px 0;flex:0 0 auto}
 .brand{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.brand .lead{display:flex;align-items:center;gap:10px;min-width:0}
 .brand h1{margin:0;font-size:24px;font-weight:800;letter-spacing:-.03em;font-variation-settings:"wdth" 90}
 .brand .actions{display:flex;gap:8px}
 .btn-top{border:1.5px solid rgba(255,255,255,.35);background:transparent;border-radius:12px;padding:7px 13px;color:#fff;font-weight:600;font-size:14px}
 .btn-top.primary{background:#fff;color:#1C3F7A;border-color:#fff}
 .btn-top.icon{padding:7px 9px;display:grid;place-items:center}
 .btn-top.icon svg{width:18px;height:18px}
-.people{display:flex;margin-top:12px}
+.people{display:flex;margin-top:8px}
 .people button{flex:1;border:0;background:transparent;color:rgba(255,255,255,.62);padding:9px 4px 10px;font-weight:600;font-size:15px;border-bottom:3px solid transparent}
 .people button[aria-selected=true]{color:#fff;border-bottom-color:#fff}
-.months{display:flex;gap:6px;overflow-x:auto;padding:12px 0 14px;scrollbar-width:none}
+.months{display:flex;gap:6px;overflow-x:auto;padding:10px 0 12px;scrollbar-width:none}
+.pagettl{display:none}
 .months::-webkit-scrollbar{display:none}
 .mchip{flex:0 0 auto;border:0;background:rgba(255,255,255,.1);color:rgba(255,255,255,.85);border-radius:10px;padding:7px 12px;font-size:14px;white-space:nowrap;font-weight:500}
 .mchip[aria-pressed=true]{background:#fff;color:#1C3F7A;font-weight:700}
 
-main{flex:1 0 auto;width:100%;min-width:0;padding:18px 14px 28px;max-width:720px;margin:0 auto}
+main{flex:1 1 auto;min-height:0;width:100%;min-width:0;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;
+  padding:16px max(14px, calc((100% - 720px) / 2)) 28px}
+main.fill{display:flex;flex-direction:column;overflow:hidden;padding-bottom:10px}
+main.fill .txlist{flex:1 1 auto;min-height:0;overflow-y:auto}
 .muted{color:var(--muted)}
 .row{display:flex;align-items:center;justify-content:space-between;gap:10px}
 .sub{font-size:13px;color:var(--muted)}
@@ -203,7 +208,7 @@ select.inp{appearance:auto}
 .x{border:0;background:transparent;color:var(--muted);font-size:22px;line-height:1;padding:4px 8px}
 
 /* Alt menü */
-nav.tabs{position:sticky;bottom:0;background:var(--paper);border-top:1px solid var(--line);display:flex;
+nav.tabs{flex:0 0 auto;background:var(--paper);border-top:1px solid var(--line);display:flex;
   padding:6px 8px max(10px, env(safe-area-inset-bottom,0px));z-index:6}
 nav.tabs button{flex:1;border:0;background:transparent;padding:4px 0;font-size:12.5px;color:var(--muted);display:flex;flex-direction:column;align-items:center;gap:3px;font-weight:600}
 nav.tabs button svg{width:22px;height:22px;padding:4px 14px;box-sizing:content-box;border-radius:14px}
@@ -304,6 +309,78 @@ textarea.inp{min-height:90px;font-family:var(--mono);font-size:12px}
 .poster .receipt{animation:none}
 .p-foot{text-align:center;font-size:11.5px;color:var(--muted);padding-top:4px}
 [hidden]{display:none!important}
+/* ===== Navigasyon paneli ===== */
+.scrim.side{justify-content:flex-start;align-items:stretch}
+.sheet.drawer{width:86%;max-width:340px;height:100%;max-height:none;border-radius:0 22px 22px 0;padding:calc(18px + env(safe-area-inset-top,0px)) 12px 18px;animation:slin .2s ease-out}
+.sheet.drawer::before{display:none}
+@keyframes slin{from{transform:translateX(-30px);opacity:.5}to{transform:none;opacity:1}}
+.drawer .dh{display:flex;align-items:center;justify-content:space-between;padding:0 6px 10px}
+.drawer .dh b{font-size:22px;font-weight:800;letter-spacing:-.03em}
+.drawer .grp{font-size:11.5px;font-weight:700;letter-spacing:.08em;color:var(--muted);text-transform:uppercase;margin:14px 8px 4px}
+.navi{display:flex;align-items:center;gap:12px;width:100%;border:0;background:transparent;border-radius:12px;padding:9px 8px;text-align:left;color:var(--ink)}
+.navi .ni{width:36px;height:36px;border-radius:10px;display:grid;place-items:center;font-size:17px;background:var(--soft);flex:0 0 36px}
+.navi b{font-weight:600;font-size:15px;display:block}
+.navi span.s{font-size:12px;color:var(--muted);display:block;line-height:1.3}
+.navi[aria-current=page]{background:var(--accent-t)}
+.navi[aria-current=page] b{color:var(--accent)}
+.navi .cnt{margin-left:auto;font-size:12px;font-weight:700;background:var(--warn-bg);color:var(--warn-fg);border-radius:8px;padding:2px 7px}
+/* ===== İç kaydırmalı paneller ===== */
+.tpanel{padding-bottom:6px}
+.tpanel h2{margin-bottom:10px}
+.ptabs{display:flex;gap:4px;overflow-x:auto;scrollbar-width:none;margin:0 -16px 0;padding:0 16px 10px;border-bottom:1px solid var(--hair)}
+.ptabs::-webkit-scrollbar{display:none}
+.ptabs button{flex:0 0 auto;border:0;background:var(--soft);color:var(--muted);border-radius:10px;padding:7px 12px;font-size:13.5px;font-weight:600;white-space:nowrap}
+.ptabs button[aria-selected=true]{background:var(--accent-fill);color:var(--on-accent)}
+.scrollpanel{max-height:var(--panel-h,min(58dvh,560px));overflow-y:auto;overscroll-behavior-y:auto;margin:0 -16px;padding:4px 16px 10px;
+  scrollbar-width:thin;mask-image:linear-gradient(to bottom,#000 calc(100% - 18px),transparent);-webkit-mask-image:linear-gradient(to bottom,#000 calc(100% - 18px),transparent)}
+.sheettabs{margin:10px -18px 4px;padding:0 18px 10px}
+.scrollpanel.short{--panel-h:min(42dvh,380px)}
+.tp-body[hidden]{display:none}
+.panelnote{font-size:12px;color:var(--muted);text-align:center;margin:2px 0 0}
+/* ===== Sayfa başlığı ===== */
+.pagehead{margin:0 2px 14px}
+.pagehead h2{margin:0;font-size:22px;font-weight:800;letter-spacing:-.025em}
+.pagehead p{margin:4px 0 0;font-size:13.5px;color:var(--muted)}
+/* ===== Uyarı şeridi ===== */
+.alerts{display:flex;gap:8px;overflow-x:auto;scrollbar-width:none;margin:0 -14px 14px;padding:0 14px}
+.alerts::-webkit-scrollbar{display:none}
+.alert{flex:0 0 auto;max-width:78%;border:0;text-align:left;border-radius:14px;padding:10px 12px;background:var(--paper);display:flex;gap:10px;align-items:center;color:var(--ink)}
+.alert .ai{font-size:18px}
+.alert b{display:block;font-size:13.5px}
+.alert span.s{display:block;font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.alert.warn{background:var(--warn-bg)} .alert.warn b{color:var(--warn-fg)}
+.alert.ok{background:var(--ok-bg)} .alert.ok b{color:var(--ok-fg)}
+.actrow{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 14px}
+.tbars.compact{gap:4px}
+.tbars.compact .tcol{flex:1 1 0;min-width:0}
+.tbars.compact .tcol .b{width:min(16px,80%)}
+.tbars.compact .tcol .val{font-size:9.5px}
+.tbars.compact .tcol .lbl{font-size:10.5px}
+table.t td{white-space:nowrap}
+table.t td:first-child{white-space:normal}
+.actrow .btn{flex:1 1 0;padding:10px 8px;font-size:13.5px;white-space:nowrap}
+/* Sınıflandırma, hedefler */
+.clsg{padding:12px 0;border-bottom:1px solid var(--hair)}
+.clsg:last-child{border-bottom:0}
+.qchips{display:flex;flex-wrap:wrap;gap:6px}
+.qchips .chip{background:var(--soft);font-size:13px;padding:6px 10px}
+.qchips .chip.skip{background:transparent;color:var(--muted);box-shadow:inset 0 0 0 1.5px var(--line)}
+.goal{background:var(--soft);border-radius:14px;padding:12px 14px;margin-bottom:8px;cursor:pointer}
+.goal b{font-size:15px}
+/* Kilit ekranı */
+.lock{position:fixed;inset:0;z-index:60;background:var(--head);color:#fff;display:grid;place-items:center;padding:env(safe-area-inset-top,0px) 20px env(safe-area-inset-bottom,0px)}
+.lk-in{width:100%;max-width:320px;text-align:center}
+.lk-brand{font-size:30px;font-weight:800;letter-spacing:-.03em;font-variation-settings:"wdth" 90}
+.lk-msg{opacity:.8;margin:6px 0 18px}
+.lk-dots{display:flex;justify-content:center;gap:14px;margin-bottom:26px}
+.lk-dots i{width:14px;height:14px;border-radius:50%;box-shadow:inset 0 0 0 2px rgba(255,255,255,.7)}
+.lk-dots i.on{background:#fff}
+.lk-dots.shake{animation:shake .35s}
+@keyframes shake{25%{transform:translateX(-8px)}75%{transform:translateX(8px)}}
+.lk-pad{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;justify-items:center}
+.lk-pad button{width:72px;height:72px;border-radius:50%;border:0;background:rgba(255,255,255,.12);color:#fff;font-size:26px;font-weight:600}
+.lk-pad button:active{background:rgba(255,255,255,.28)}
+.lk-forgot{margin-top:22px;border:0;background:none;color:rgba(255,255,255,.75);text-decoration:underline;font-size:14px}
 .flow .planline{fill:none;stroke:var(--muted);stroke-width:1.5;stroke-dasharray:4 4}
 .flow .plandot{fill:var(--paper);stroke:var(--muted);stroke-width:2}
 .flow .ax.real{fill:var(--ink);font-weight:700}
@@ -356,11 +433,12 @@ textarea.inp{min-height:90px;font-family:var(--mono);font-size:12px}
 <body>
 <header class="top">
   <div class="brand">
-    <h1>Ekstrem</h1>
+    <div class="lead"><button class="btn-top icon" id="btnMenu" aria-label="Menü"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
+    <h1>Ekstrem</h1></div>
     <div class="actions">
       <button class="btn-top primary" id="btnImport">+ Ekstre</button>
       <button class="btn-top icon" id="btnTheme" aria-label="Koyu temaya geç"></button>
-      <button class="btn-top" id="btnSettings" aria-label="Ayarlar">Ayarlar</button>
+      <button class="btn-top icon" id="btnSettings" aria-label="Ayarlar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg></button>
     </div>
   </div>
   <div class="people" id="people" role="tablist" aria-label="Kişi"></div>

@@ -1,6 +1,6 @@
 {
   "name": "ekstrem",
-  "version": "1.4.1",
+  "version": "1.5.0",
   "private": true,
   "dependencies": {
     "@capacitor/android": "^6.2.0",
@@ -8,7 +8,10 @@
     "@capacitor/core": "^6.2.0",
     "@capacitor/app": "^6.0.1",
     "@capacitor/filesystem": "^6.0.0",
-    "@capacitor/share": "^6.0.0"
+    "@capacitor/share": "^6.0.0",
+    "@capacitor/local-notifications": "^6.1.3",
+    "send-intent": "^6.0.3",
+    "@aparajita/capacitor-biometric-auth": "^8.0.2"
   },
   "description": "Kredi kartı ekstresi okuyan ve harcama planlayan Android uygulaması"
 }
