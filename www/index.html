@@ -3187,8 +3187,14 @@ function goalInfo(g, calc) {
   else if (mDiff(now, g.due) < 0) { st = 'warn'; txt = 'Süre doldu.'; }
   else if (item) { st = minBal != null && minBal < 0 ? 'warn' : 'ok'; txt = `Planda ayda ${tl0(item.amount)} ayrılıyor.${minBal != null && minBal < 0 ? ' Ama plan bazı aylarda eksiye düşüyor.' : ''}`; }
   else if (surplus == null) { st = ''; txt = `Ayda ${tl0(perMonth)} ayırman gerekiyor. Plan dönemi hedef tarihine yetişmiyor.`; }
-  else if (surplus >= perMonth) { st = 'ok'; txt = `Planına göre ayda ortalama ${tl0(surplus)} artıyor; ${tl0(perMonth)} ayırırsan yetişir.`; }
-  else { st = 'warn'; txt = surplus > 0 ? `Ayda ${tl0(perMonth)} gerekiyor ama planda ortalama ${tl0(surplus)} artıyor.` : `Ayda ${tl0(perMonth)} gerekiyor; plan şu an artı vermiyor.`; }
+  else {
+    // Plana eklenmemiş tüm hedefler aynı artıyı paylaşır
+    const open = visibleGoals().filter(x => x.saved < x.target && !S.plan.items.some(it => it.id === x.itemId) && mDiff(now, x.due) >= 0);
+    const all = sum(open, x => Math.max(0, x.target - x.saved) / Math.max(1, mDiff(now, x.due) + 1));
+    const both = open.length > 1 ? ` (tüm hedeflerin için ${tl0(all)})` : '';
+    if (surplus >= all) { st = 'ok'; txt = `Planına göre ayda ortalama ${tl0(surplus)} artıyor; bu hedef için ${tl0(perMonth)}${both} ayırırsan yetişir.`; }
+    else { st = 'warn'; txt = surplus > 0 ? `Bu hedef için ayda ${tl0(perMonth)}${both} gerekiyor ama planda ortalama ${tl0(surplus)} artıyor.` : `Ayda ${tl0(perMonth)} gerekiyor; plan şu an artı vermiyor.`; }
+  }
   return { left, need, perMonth, item, st, txt, ratio: Math.min(1, g.saved / g.target) };
 }
 function goalCard(g, calc, compact) {

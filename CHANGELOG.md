@@ -1,5 +1,20 @@
 # Değişiklik Günlüğü
 
+## v1.5.0 — 2026-10-03
+
+- Yeni gezinme: sol menüden tüm sayfalar; Özet, Plan ve Ayarlar sekmeli panellerde, uzun listeler panelin içinde kayar; İşlemler'de arama sabit kalır
+- Özet'te uyarı şeridi: bütçe aşımı, faiz ve ücret, abonelik zammı, kategorisiz işlemler, yaklaşan son ödeme
+- Bütçeler: kategori sınırları, son ayların ortalamasından öneri, ay sonu tahmini, plandaki kart harcaması tahminiyle bağlantı
+- Abonelikler: tekrarlayan ödemelerin bulunması, aylık/yıllık maliyet, zam uyarısı
+- Faiz ve ücretler: türe ve bankaya göre, son 12 ay
+- Kategorisizler: Diğer'e düşen işyerlerini tek dokunuşla sınıflandırma
+- Bunu alırsam?: bir alışverişin peşin ya da taksitli olarak plana etkisi
+- Hedefler: birikim hedefleri, plana göre yetişme durumu, plana aylık birikim kalemi
+- Kişiler: hanede kimin ne kadar harcadığının trendi (borç/alacak hesabı yok)
+- Yıl özeti ve PNG çıktısı
+- Android: Paylaş → Ekstrem ile PDF içe aktarma, son ödeme hatırlatıcısı, PIN ve parmak izi kilidi
+- Özet'teki plan karşılaştırması kısa tabloya indi; ayrıntısı ayrı pencerede
+
 ## v1.4.1 — 2026-10-03
 
 - Plan başlangıç ayı ileri alındığında önceki aylar (gerçekleşen ya da planlanan) artık hesaptan düşmüyor; sonuçları ilk aya devir olarak geliyor. Bilançoda "Önceki aylar" bölümü görünür

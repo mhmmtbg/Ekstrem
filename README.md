@@ -8,19 +8,25 @@ Tüm veriler yalnızca telefonda saklanır; hiçbir sunucuya gönderilmez.
 
 ## Öne çıkanlar
 
-- **Ekstreden otomatik okuma:** PDF ekstre seçilir, işlemler, taksitler, iadeler ve faizler ayrıştırılır. Her ekstre bankanın dönem borcu hesabıyla karşılaştırılır; tutan ekstreye "Banka toplamıyla eşleşti" kaşesi basılır.
-- **Fiş görünümünde özet:** Ayın harcaması bankalara göre kalem kalem bir kasa fişinde. Barkodun çizgileri kategorilerin harcamadaki payını, firuze çizgi gelirin nereye kadar yettiğini gösterir.
-- **Kategoriler ve arama:** 20 kategoriye otomatik ayırma, önceki aya göre farklar, işyeri, kategori, banka, tutar ya da tarihle arama. Bir işlemin kategorisini değiştirince aynı işyerinin tüm işlemlerine kural olarak uygulanabilir.
-- **Harcama takvimi:** Günlük harcamalar ısı haritalı bir takvimde; en yoğun gün ve hafta sonu payı.
-- **Kişiler:** Ben, Eşim ve ikisinin toplamı olan Hane sekmeleri. Her kart bir kez bir kişiye atanır, sonraki ekstreleri otomatik o kişiye gider.
+- **Ekstreden otomatik okuma:** PDF ekstre seçilir (ya da e-postadan, WhatsApp'tan **Paylaş → Ekstrem** ile gönderilir), işlemler, taksitler, iadeler ve faizler ayrıştırılır. Her ekstre bankanın dönem borcu hesabıyla karşılaştırılır; tutan ekstreye "Banka toplamıyla eşleşti" kaşesi basılır.
+- **Az kaydırma:** Sol menüden tüm sayfalara geçilir. Uzun listeler (kategoriler, işlemler, bilanço, taksit takvimi) ekranı uzatmaz; sekmeli panellerin içinde kayar.
+- **Fiş görünümünde özet:** Ayın harcaması bankalara göre kalem kalem bir kasa fişinde. Üstteki uyarı şeridi bütçe aşımını, faizi, abonelik zammını, kategorisiz işlemleri ve yaklaşan son ödeme günlerini gösterir.
+- **Harcama detayları:** Kategoriler (önceki aya göre farklarıyla), en çok harcanan yerler, ısı haritalı harcama takvimi, kartlar, taksitler ve ekstreler tek panelde.
+- **Bütçeler:** Kategorilere aylık sınır; son ayların ortalamasından öneri, aşım uyarısı, plandaki harcama tahminiyle bağlantı.
+- **Abonelikler:** Her ay benzer tutarla tekrarlayan ödemeler kendiliğinden bulunur; aylık ve yıllık maliyet, zam uyarısı.
+- **Faiz ve ücretler:** Bankaya ödenen faiz, BSMV/KKDF, kart aidatı ve gecikme bedelleri ay ay, türüne ve bankasına göre.
+- **Kategorisizler:** "Diğer"e düşen işyerleri tek ekranda; tek dokunuşla kategori seçilir ve kural olarak kaydedilir.
+- **Kişiler:** Ben, Eşim ve Hane sekmeleri; hanede kimin ne kadar harcadığının ay ay trendi ve kategori karşılaştırması.
 - **Kart dışı harcamalar ve gelir:** Nakit, banka kartı ve havale harcamaları ile aylık gelirler elle girilir; özete, kategorilere ve plana dahil olur.
 - **Plan:**
-  - Önümüzdeki 3, 6 ya da 12 ayın nakit akışı. Kartlardaki kalan taksitler ekstrelerden kendiliğinden gelir; gelir ve gider kalemleri (her ay, belirli sayıda ay ya da tek seferlik) elle eklenir.
-  - Her ayın bilançosu; artı bilanço sonraki aya gelir, eksi bilanço gider olarak devreder. Devirler elle düzenlenebilir.
-  - Taksit takvimi: hangi taksidin hangi ay bittiği.
-- **Plan ile gerçekleşen:** Bir ayın ekstreleri yüklenince ay "gerçekleşti" sayılır. Plan kalemleri ekstre, kart dışı kayıt ve girilen gelirlerle eşleştirilir; sapmalar raporlanır ve gerçekleşen bilanço sonraki ayların planına devreder.
-- **Görsel çıktı:** Özet fişi, plan grafikleri, bilanço tablosu ve karşılaştırma raporu PNG olarak kaydedilir ya da paylaşılır.
-- **Koyu tema**, kopya ekstre tespiti, yedekleme ve geri yükleme.
+  - Önümüzdeki 3, 6 ya da 12 ayın nakit akışı. Kartlardaki kalan taksitler ekstrelerden kendiliğinden gelir; gelir ve gider kalemleri elle eklenir.
+  - Her ayın bilançosu; artı bilanço sonraki aya gelir, eksi bilanço gider olarak devreder. Başlangıç ayı ileri alınsa da önceki ayların sonucu devreder; istenirse sıfırdan başlanır.
+  - **Bunu alırsam?** Bir alışverişin peşin ya da taksitli olarak plana etkisi, plana dokunmadan.
+  - **Hedefler:** Birikim hedefleri, plana göre yetişip yetişmeyeceği ve tek dokunuşla plana aylık birikim kalemi.
+- **Plan ile gerçekleşen:** Bir ayın ekstreleri yüklenince ay "gerçekleşti" sayılır. Plan kalemleri ekstre, kart dışı kayıt ve girilen gelirlerle eşleştirilir; sapmalar raporlanır.
+- **Yıl özeti:** Yılın toplamı, en pahalı ay, en çok harcanan kategori ve yerler, ödenen faiz; PNG olarak kaydedilir.
+- **Android kolaylıkları:** Son ödeme gününden önce bildirim, PIN ya da parmak izi ile uygulama kilidi, kapanırken otomatik yedek.
+- **Görsel çıktı, koyu tema**, kopya ekstre tespiti, yedekleme ve geri yükleme.
 
 ### Desteklenen bankalar
 
@@ -62,25 +68,37 @@ Ayrıntılı kullanım için: **[docs/KULLANIM.md](docs/KULLANIM.md)**
 
 > Görüntülerdeki tüm işlemler, tutarlar ve kart numaraları uydurmadır.
 
-| Fiş görünümünde özet | Kategoriler |
+| Fiş görünümünde özet | Harcama detayları |
 |---|---|
-| ![Özet](docs/images/ekran-ozet.png) | ![Kategoriler](docs/images/ekran-kategoriler.png) |
+| ![Özet](docs/images/ekran-ozet.png) | ![Harcama detayları](docs/images/ekran-detay.png) |
 
-| Harcama takvimi | İşlemler ve arama |
+| Menü | İşlemler ve arama |
 |---|---|
-| ![Takvim](docs/images/ekran-takvim.png) | ![İşlemler](docs/images/ekran-islemler.png) |
+| ![Menü](docs/images/ekran-menu.png) | ![İşlemler](docs/images/ekran-islemler.png) |
+
+| Bütçeler | Abonelikler |
+|---|---|
+| ![Bütçeler](docs/images/ekran-butce.png) | ![Abonelikler](docs/images/ekran-abonelik.png) |
 
 | Plan: nakit akışı | Plan: aylık bilanço |
 |---|---|
 | ![Plan](docs/images/ekran-plan.png) | ![Bilanço](docs/images/ekran-bilanco.png) |
 
-| Plan ile gerçekleşen | Taksit takvimi |
+| Bunu alırsam? | Hedefler |
 |---|---|
-| ![Karşılaştırma](docs/images/ekran-karsilastirma.png) | ![Taksitler](docs/images/ekran-taksit.png) |
+| ![Simülasyon](docs/images/ekran-simulasyon.png) | ![Hedefler](docs/images/ekran-hedef.png) |
 
-| Aylar | Koyu tema |
+| Plan ile gerçekleşen | Kategorisizler |
 |---|---|
-| ![Aylar](docs/images/ekran-aylar.png) | ![Koyu tema](docs/images/ekran-ozet-koyu.png) |
+| ![Karşılaştırma](docs/images/ekran-karsilastirma.png) | ![Kategorisizler](docs/images/ekran-sinif.png) |
+
+| Kişiler | Yıl özeti |
+|---|---|
+| ![Kişiler](docs/images/ekran-kisi.png) | ![Yıl özeti](docs/images/ekran-yil.png) |
+
+| Harcama takvimi | Koyu tema |
+|---|---|
+| ![Takvim](docs/images/ekran-takvim.png) | ![Koyu tema](docs/images/ekran-plan-koyu.png) |
 
 PNG çıktısı örnekleri:
 
@@ -93,6 +111,8 @@ PNG çıktısı örnekleri:
 - Ekstreler telefonda okunur; PDF'ler ve işlemler hiçbir sunucuya gönderilmez. Uygulamanın bir sunucusu, hesabı ya da analitiği yoktur.
 - Veriler uygulamanın kendi deposunda (IndexedDB) durur. Uygulama silinirse veriler de silinir; **Ayarlar → Yedekleme** ile yedek dosyası alınabilir. Android uygulaması ayrıca her kapanışta **Belgeler › Ekstrem › ekstrem-otomatik-yedek.json** dosyasına otomatik yedek yazar.
 - Yedek dosyası tüm işlemlerinizi içerir; paylaşırken dikkat edin.
+- Uygulama kilidi (PIN, parmak izi) telefonu başkası kullandığında ekranı korur; veriler telefonda şifrelenmiş olarak saklanmaz.
+- Son ödeme hatırlatıcısı telefonun kendi bildirimleriyle çalışır; internet kullanmaz.
 
 ## Depo yapısı
 
@@ -103,6 +123,7 @@ src/                 Uygulamanın kaynak kodu (HTML, CSS, JavaScript)
   plan.js            Plan, gerçekleşme karşılaştırması, tema, PNG çıktısı
   parser.js          Ziraat Bankkart ayrıştırıcısı
   generic.js         Genel ayrıştırıcı (Ziraat dışındaki tüm bankalar)
+  features.js        Bütçe, abonelik, faiz, sınıflandırma, hedef, kişiler, yıl özeti, menü, kilit, hatırlatıcı
   cats.js            Kategori kuralları
   build.py           Hepsini tek dosyalık www/index.html olarak birleştirir
 www/                 Derlenmiş uygulama (APK'nın içine giren tek HTML dosyası, ikonlar)
